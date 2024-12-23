@@ -1,0 +1,6 @@
+virtual_platform/
+test*
+.env/
+__pycache__/
+*.pyc
+*.pyo
