@@ -10,11 +10,12 @@
 <div class="text-center mt-4">
     <a href="{{ url_for('index') }}" class="btn btn-secondary btn-lg">Upload Another File</a>
 </div>
+
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
-
 <script>
     const phrases = {{ frequencies|tojson }};
+    const originalText = {{ text|tojson }};
     const words = Object.entries(phrases).map(([text, size]) => ({
         text: text,
         size: 10 + size * 5 
@@ -52,24 +53,19 @@
             .attr("text-anchor", "middle")
             .attr("transform", d => `translate(${d.x}, ${d.y})`)
             .text(d => d.text)
-            .each(function (d) {
-                d.originalSize = d.size;
-            })
             .on("mouseover", function (event, d) {
-                const originalSize = d.originalSize; // Use the stored original size
                 d3.select(this)
                     .transition()
-                    .style("font-size", `${originalSize * 1.3}px`); // Enlarge based on the original size
+                    .style("font-size", `${d.size * 1.3}px`);
             })
             .on("mouseout", function (event, d) {
-                const originalSize = d.originalSize; // Use the stored original size
                 d3.select(this)
                     .transition()
-                    .style("font-size", `${originalSize}px`); // Reset to the original size
+                    .style("font-size", `${d.size}px`);
             })
             .on("click", function (event, d) {
                 const url = new URL('/highlight_phrase', window.location.origin);
-                url.searchParams.append('text', {{ text|tojson }});
+                url.searchParams.append('original_text', originalText);
                 url.searchParams.append('phrase', d.text);
                 Object.keys(phrases).forEach((p) => url.searchParams.append('phrases', p));
                 window.location.href = url.toString();

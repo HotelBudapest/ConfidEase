@@ -42,10 +42,10 @@ def extract_keywords():
     file = request.files['file']
     if file.filename == '':
         return redirect(request.url)
-    text = file.read().decode('utf-8')
-    phrases = extract_phrases(text)
-    highlighted_text = highlight_phrases(text, phrases)
-    return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases)
+    original_text = file.read().decode('utf-8')
+    phrases = extract_phrases(original_text)
+    highlighted_text = highlight_phrases(original_text, phrases)
+    return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases, original_text=original_text)
 
 @app.route('/visualization')
 def visualize_phrases():
@@ -57,11 +57,11 @@ def visualize_phrases():
 
 @app.route('/highlight_phrase')
 def highlight_phrase():
-    text = request.args.get('text', '')
+    original_text = request.args.get('original_text', '')
     phrases = request.args.getlist('phrases')
     selected_phrase = request.args.get('phrase')
-    highlighted_text = highlight_phrases(text, phrases, selected_phrase)
-    return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases)
+    highlighted_text = highlight_phrases(original_text, phrases, selected_phrase)
+    return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases, original_text=original_text)
 
 
 if __name__ == '__main__':

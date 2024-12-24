@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1 class="text-center mb-4">Extracted Phrases Highlighted</h1>
+<h1 class="text-center mb-4">Highlighted Text</h1>
 
 <div class="fade-in text-content">
     <p>{{ highlighted_text|safe }}</p>
 </div>
 
 <div class="text-center mt-4">
-    <a href="{{ url_for('visualize_phrases', text=highlighted_text, phrases=phrases) }}" class="btn btn-primary btn-lg">Visualize Phrases</a>
+    <a href="{{ url_for('visualize_phrases', text=original_text, phrases=phrases) }}" class="btn btn-secondary">Visualize Phrases</a>
 </div>
 
 <div class="text-center mt-4">
