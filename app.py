@@ -27,7 +27,7 @@ def extract_keywords():
     if file.filename == '':
         return redirect(request.url)
     text = file.read().decode('utf-8')
-    phrases = extract_phrases(text, keep_single_word=False)
+    phrases = extract_phrases(text)
     highlighted_text = highlight_phrases(text, phrases)
     return render_template('results.html', highlighted_text=highlighted_text)
 
