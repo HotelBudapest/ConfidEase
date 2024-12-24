@@ -1,18 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extraction Results</title>
-</head>
-<body>
-    <h1>Extracted Keywords</h1>
-    <ul>
-        {% for keyword in keywords %}
-            <li>{{ keyword }}</li>
-        {% endfor %}
-    </ul>
-    <a href="{{ url_for('index') }}">Upload Another File</a>
-</body>
-</html>
+{% extends "base.html" %}
 
+{% block content %}
+<h1 class="text-center mb-4">Extracted Phrases Highlighted</h1>
+
+<div class="fade-in text-content">
+    <p>{{ highlighted_text|safe }}</p>
+</div>
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary btn-lg">Upload Another File</a>
+</div>
+{% endblock %}

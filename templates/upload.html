@@ -1,16 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Keyword Extractor</title>
-</head>
-<body>
-    <h1>Upload a Text File</h1>
-    <form action="{{ url_for('extract_keywords') }}" method="POST" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".txt" required>
-        <button type="submit">Extract Keywords</button>
-    </form>
-</body>
-</html>
+{% extends "base.html" %}
 
+{% block content %}
+<h1 class="text-center mb-4">Upload a Text File</h1>
+
+<div class="d-flex justify-content-center">
+    <form action="{{ url_for('extract_keywords') }}" method="POST" enctype="multipart/form-data" class="text-center border p-4 shadow">
+        <div class="mb-3">
+            <input type="file" name="file" accept=".txt" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg">Upload</button>
+    </form>
+</div>
+{% endblock %}
