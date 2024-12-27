@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="text-center mb-4">Edit Key Phrases</h1>
+
+<!-- Form for saving changes -->
+<form id="phrase-editor-form" method="POST" action="{{ url_for('edit_phrases') }}">
+    <input type="hidden" name="original_text" value="{{ original_text|escape }}">
+    <input type="hidden" id="updated-phrases" name="phrases" value="{{ phrases|tojson }}">
+
+    <div class="text-content" id="editor-container">
+        {% for word in original_text.split() %}
+            {% if word in phrases %}
+                <span class="highlight editable" data-word="{{ word }}">
+                    {{ word }}
+                    <span class="add-icon" onclick="extendPhrase(this)">+</span>
+                </span>
+            {% else %}
+                <span class="editable" data-word="{{ word }}" onclick="toggleHighlight(this)">
+                    {{ word }}
+                    <span class="add-icon" onclick="addPhrase(this)">+</span>
+                </span>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <div class="text-center mt-4">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="{{ url_for('visualize_phrases', text=original_text, phrases=phrases) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<!-- Include JavaScript -->
+<script>
+    let phrases = new Set({{ phrases|tojson }});
+
+    // Toggle highlighting for existing phrases
+    function toggleHighlight(element) {
+        const word = element.getAttribute('data-word');
+        if (phrases.has(word)) {
+            phrases.delete(word);
+            element.classList.remove('highlight');
+        } else {
+            phrases.add(word);
+            element.classList.add('highlight');
+        }
+        updatePhrasesInput();
+    }
+
+    // Add a new word to the key phrases
+    function addPhrase(icon) {
+        const wordElement = icon.parentElement;
+        const word = wordElement.getAttribute('data-word');
+        phrases.add(word);
+        wordElement.classList.add('highlight');
+        updatePhrasesInput();
+    }
+
+    // Extend a phrase by combining adjacent words
+    function extendPhrase(icon) {
+        const wordElement = icon.parentElement;
+        const word = wordElement.getAttribute('data-word');
+        let phrase = word;
+
+        // Check for adjacent highlighted words to the right
+        let nextElement = wordElement.nextElementSibling;
+        while (nextElement && nextElement.classList.contains('highlight')) {
+            phrase += ' ' + nextElement.getAttribute('data-word');
+            nextElement = nextElement.nextElementSibling;
+        }
+
+        // Add the extended phrase to the set
+        phrases.add(phrase);
+        wordElement.classList.add('highlight');
+        updatePhrasesInput();
+    }
+
+    // Update the hidden input with the latest phrases
+    function updatePhrasesInput() {
+        document.getElementById('updated-phrases').value = JSON.stringify(Array.from(phrases));
+    }
+</script>
+
+<style>
+    .text-content {
+        line-height: 1.8;
+    }
+    .editable {
+        cursor: pointer;
+        margin-right: 4px;
+    }
+    .highlight {
+        background-color: yellow;
+        color: black;
+        font-weight: bold;
+        border-radius: 4px;
+        padding: 2px 4px;
+    }
+    .add-icon {
+        color: green;
+        font-weight: bold;
+        cursor: pointer;
+        margin-left: 4px;
+        visibility: hidden;
+    }
+    .editable:hover .add-icon {
+        visibility: visible;
+    }
+</style>
+{% endblock %}

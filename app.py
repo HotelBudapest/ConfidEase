@@ -63,6 +63,17 @@ def highlight_phrase():
     highlighted_text = highlight_phrases(original_text, phrases, selected_phrase)
     return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases, original_text=original_text)
 
+@app.route('/edit_phrases', methods=['GET', 'POST'])
+def edit_phrases():
+    if request.method == 'POST':
+        original_text = request.form.get('original_text', '')
+        phrases = request.form.get('phrases', '[]')
+        phrases = eval(phrases)
+        highlighted_text = highlight_phrases(original_text, phrases)
+        return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases, original_text=original_text)
+    original_text = request.args.get('original_text', '')
+    phrases = request.args.getlist('phrases')
+    return render_template('editor.html', original_text=original_text, phrases=phrases)
 
 if __name__ == '__main__':
     app.run(debug=True)
