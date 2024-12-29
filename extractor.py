@@ -44,7 +44,7 @@ def extract_phrases(
                 phrases.append(token.text)
         accum_tokens.clear()
     for token in doc:
-        if token.pos_ in ALLOWED_POS and not token.is_stop and token.is_alpha:
+        if token.pos_ in ALLOWED_POS and not token.is_stop:
             accum_tokens.append(token)
         else:
             flush_acc()

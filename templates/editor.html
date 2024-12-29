@@ -16,8 +16,9 @@
                 <span class="add-icon" onclick="addPhrase(this)">+</span>
             {% endif %}
         </span>
-        {% if not loop.last %}
-            <span class="join-icon" onclick="joinWords(this)" 
+        {% if loop.index < words_info|length - 1 %}
+            <span class="join-icon" 
+                  onclick="joinPhrases(this)" 
                   data-current-word="{{ word_info.word }}" 
                   data-next-word="{{ words_info[loop.index].word }}">+</span>
         {% endif %}
@@ -25,24 +26,14 @@
     </div>
     <div class="text-center mt-4">
         <button type="submit" class="btn btn-primary">Save Changes</button>
-        <a href="{{ url_for('visualize_phrases', text=original_text, phrases=phrases) }}" class="btn btn-secondary">Cancel</a>
+        <a href="{{ url_for('highlight_phrase', original_text=original_text, phrases=phrases) }}" class="btn btn-secondary">Cancel</a>
     </div>
 </form>
 
 <script>
     let phrases = new Set({{ phrases|tojson }});
     let multiWordPhrases = new Set([...phrases].filter(phrase => phrase.includes(' ')));
-    function toggleHighlight(element) {
-        const word = element.getAttribute('data-word');
-        if (phrases.has(word)) {
-            phrases.delete(word);
-            element.classList.remove('highlight');
-        } else {
-            phrases.add(word);
-            element.classList.add('highlight');
-        }
-        updatePhrasesInput();
-    }
+
     function addPhrase(icon) {
         const wordElement = icon.parentElement;
         const word = wordElement.getAttribute('data-word');
@@ -50,6 +41,7 @@
         wordElement.classList.add('highlight');
         updatePhrasesInput();
     }
+
     function removePhrase(icon) {
         const wordElement = icon.parentElement;
         const word = wordElement.getAttribute('data-word');
@@ -69,19 +61,25 @@
         updatePhrasesInput();
     }
 
-    function joinWords(icon) {
+    function joinPhrases(icon) {
         const currentWord = icon.getAttribute('data-current-word');
         const nextWord = icon.getAttribute('data-next-word');
-        
-        phrases.delete(currentWord);
-        phrases.delete(nextWord);
+
+        // Add new phrase and remove individual words from the set
         const newPhrase = `${currentWord} ${nextWord}`;
         phrases.add(newPhrase);
         multiWordPhrases.add(newPhrase);
+        phrases.delete(currentWord);
+        phrases.delete(nextWord);
+
+        // Highlight connected words
         const currentElements = document.querySelectorAll(`[data-word="${currentWord}"]`);
         const nextElements = document.querySelectorAll(`[data-word="${nextWord}"]`);
         currentElements.forEach(el => el.classList.add('highlight'));
         nextElements.forEach(el => el.classList.add('highlight'));
+
+        // Replace join icon with connector arrow
+        icon.outerHTML = '<span class="connector-icon">→</span>';
         
         updatePhrasesInput();
     }
@@ -89,6 +87,27 @@
     function updatePhrasesInput() {
         document.getElementById('updated-phrases').value = JSON.stringify(Array.from(phrases));
     }
+
+    // Show join icon between two words
+    document.addEventListener('mouseover', function (event) {
+        if (event.target.classList.contains('join-icon')) {
+            const prevWord = event.target.getAttribute('data-current-word');
+            const nextWord = event.target.getAttribute('data-next-word');
+            const prevElements = document.querySelectorAll(`[data-word="${prevWord}"]`);
+            const nextElements = document.querySelectorAll(`[data-word="${nextWord}"]`);
+
+            // Only show join icon if both words are not already part of a single phrase
+            if (![...prevElements, ...nextElements].some(el => el.classList.contains('highlight'))) {
+                event.target.style.visibility = 'visible';
+            }
+        }
+    });
+
+    document.addEventListener('mouseout', function (event) {
+        if (event.target.classList.contains('join-icon')) {
+            event.target.style.visibility = 'hidden';
+        }
+    });
 
     window.onload = function() {
         phrases.forEach(phrase => {
@@ -149,6 +168,12 @@
         color: #007bff;
         background-color: #cce5ff;
         margin-left: -4px;
+    }
+
+    .connector-icon {
+        color: #007bff;
+        margin: 0 4px;
+        font-weight: bold;
     }
 
     .editable:hover .add-icon,
