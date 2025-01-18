@@ -31,6 +31,14 @@ def highlight_phrases(text, phrases, selected_phrase=None):
         text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
     return text
 
+def get_word_positions(text):
+    """Generate a map of words and their positions in multi-word phrases"""
+    words_in_phrases = {}
+    words = text.split()
+    for i, word in enumerate(words):
+        words_in_phrases[i] = word
+    return words_in_phrases
+
 def summarize_keyword_in_context(text, keyword, max_length=50):
     keyword_position = text.lower().find(keyword.lower())
     if keyword_position != -1:
