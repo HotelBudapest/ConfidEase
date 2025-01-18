@@ -20,6 +20,10 @@
             <div class="summary">
                 <em>{{ summaries[phrase] }}</em>
             </div>
+            {% else %}
+            <div class="summary">
+                <em>No summary available</em>
+            </div>
             {% endif %}
         </div>
         {% endfor %}

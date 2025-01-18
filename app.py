@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 
 app = Flask(__name__)
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+summarizer = pipeline("text2text-generation", model="google/flan-t5-large")
 
 def escape_js_string(text):
     return html.escape(text).replace('\n', '\\n').replace('\r', '').replace("'", "\\'").replace('"', '\\"')
@@ -31,17 +31,42 @@ def highlight_phrases(text, phrases, selected_phrase=None):
         text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
     return text
 
-def summarize_keyword_in_context(text, keyword, max_length=50):
-    keyword_position = text.lower().find(keyword.lower())
-    if keyword_position != -1:
-        start = max(0, keyword_position - 100)
-        end = min(len(text), keyword_position + 100)
-        context = text[start:end]
-    else:
-        context = text
-    prompt = f"Explain the role of '{keyword}' in the following context: {context}"
-    summary = summarizer(prompt, max_length=30, min_length=5, do_sample=False)
-    return summary[0]['summary_text']
+def summarize_keywords_in_context(text, keywords, max_length=512):
+    try:
+        def chunk_text(text, max_length):
+            words = text.split()
+            chunks = []
+            chunk = ""
+            for word in words:
+                if len(chunk.split()) + len(word.split()) <= max_length:
+                    chunk += " " + word
+                else:
+                    chunks.append(chunk.strip())
+                    chunk = word
+            if chunk:
+                chunks.append(chunk.strip())
+            return chunks
+
+        chunks = chunk_text(text, max_length)
+        summaries = {}
+        
+        for chunk in chunks:
+            prompt = f"Summarize the roles of the following keywords in the text:\nKeywords: {', '.join(keywords)}\nText: {chunk}\nFormat your response as:\n"
+            prompt += "\n".join([f"- {keyword}:" for keyword in keywords])
+
+            # Run the model on the chunked text
+            response = summarizer(prompt, max_length=max_length, do_sample=False)
+            
+            for line in response[0].get('generated_text', '').split("\n"):
+                if ":" in line:
+                    key, val = line.split(":", 1)
+                    summaries[key.strip("- ")] = val.strip()
+
+        return summaries
+
+    except Exception as e:
+        print(f"Error summarizing keywords: {e}")
+        return {keyword: "Error generating summary" for keyword in keywords}
 
 @app.route('/')
 def index():
@@ -120,7 +145,7 @@ def phrase_list():
         addressed_phrases = request.form.getlist('addressed_phrases')
         addressed_phrases = set(addressed_phrases)
         return render_template(
-            'list.html', 
+            'list.html',
             text=request.args.get('text', ''),
             phrases=sorted(request.args.getlist('phrases')),
             frequencies=json.loads(request.args.get('frequencies', '{}')),
@@ -131,12 +156,16 @@ def phrase_list():
     text = request.args.get('text', '')
     phrases = request.args.getlist('phrases')
     frequencies = Counter(phrases)
-    summaries = {}
-    for phrase in phrases:
-        summaries[phrase] = summarize_keyword_in_context(text, phrase)
+
+    try:
+        summaries = summarize_keywords_in_context(text, phrases)
+        print(f"Summaries: {summaries}")  # Debugging line to check summaries
+    except Exception as e:
+        print(f"Error in phrase_list: {e}")
+        summaries = {phrase: "Error generating summary" for phrase in phrases}
 
     return render_template(
-        'list.html', 
+        'list.html',
         text=text,
         phrases=sorted(frequencies.keys(), key=lambda x: frequencies[x], reverse=True),
         frequencies=frequencies,
