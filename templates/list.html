@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-center mb-4">Phrase List</h1>
+
+<form method="POST" action="{{ url_for('phrase_list', text=text, phrases=phrases|tojson, frequencies=frequencies|tojson) }}">
+    <div class="phrase-list">
+        {% for phrase in phrases %}
+        <div class="phrase-item">
+            <input 
+                type="checkbox" 
+                name="addressed_phrases" 
+                value="{{ phrase }}" 
+                {% if phrase in addressed_phrases %} checked {% endif %}
+            >
+            <label>
+                <strong>{{ phrase }}</strong>
+                <small class="frequency">(Occurrences: {{ frequencies[phrase] }})</small>
+            </label>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="text-center mt-4">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{{ url_for('highlight_phrase', original_text=text, phrases=phrases|tojson) }}" class="btn btn-secondary">Back to Highlighted Text</a>
+    </div>
+</form>
+
+<style>
+    .phrase-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .phrase-item {
+        display: flex;
+        align-items: center;
+        padding: 10px 15px;
+        background: #f9f9f9;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 10px;
+    }
+
+    .phrase-item input[type="checkbox"] {
+        margin-right: 10px;
+        transform: scale(1.3);
+    }
+
+    .phrase-item label {
+        display: flex;
+        flex-direction: column;
+        font-size: 1.1rem;
+        font-weight: bold;
+    }
+
+    .phrase-item .frequency {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .btn {
+        margin: 10px;
+    }
+</style>
+{% endblock %}

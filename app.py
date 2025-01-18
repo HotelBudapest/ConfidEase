@@ -62,7 +62,11 @@ def visualize_phrases():
 @app.route('/highlight_phrase')
 def highlight_phrase():
     original_text = request.args.get('original_text', '')
-    phrases = request.args.getlist('phrases')
+    phrases = request.args.get('phrases', '[]')
+    try:
+        phrases = json.loads(phrases) if isinstance(phrases, str) else phrases
+    except json.JSONDecodeError:
+        phrases = []
     selected_phrase = request.args.get('phrase')
     highlighted_text = highlight_phrases(original_text, phrases, selected_phrase)
     return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases, original_text=original_text)
@@ -102,6 +106,31 @@ def edit_phrases():
                          original_text=original_text, 
                          phrases=phrases,
                          words_info=words_info)
+
+@app.route('/phrase_list', methods=['GET', 'POST'])
+def phrase_list():
+    if request.method == 'POST':
+        addressed_phrases = request.form.getlist('addressed_phrases')
+        addressed_phrases = set(addressed_phrases)
+        return render_template(
+            'list.html', 
+            text=request.args.get('text', ''),
+            phrases=sorted(request.args.getlist('phrases')),
+            frequencies=json.loads(request.args.get('frequencies', '{}')),
+            addressed_phrases=addressed_phrases
+        )
+    text = request.args.get('text', '')
+    phrases = request.args.getlist('phrases')
+    from collections import Counter
+    frequencies = Counter(phrases)
+
+    return render_template(
+        'list.html', 
+        text=text,
+        phrases=sorted(frequencies.keys(), key=lambda x: frequencies[x], reverse=True),
+        frequencies=frequencies,
+        addressed_phrases=set()
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
