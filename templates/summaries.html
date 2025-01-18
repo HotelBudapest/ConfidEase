@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-center mb-4">Keyword Summaries</h1>
+
+<div class="text-content">
+    <h4>Original Text</h4>
+    <p>{{ text }}</p>
+</div>
+
+<div class="summary-content mt-4">
+    <h4>Summaries</h4>
+    <ul>
+        {% for keyword, summary in summaries.items() %}
+        <li>
+            <strong>{{ keyword }}</strong>: {{ summary }}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Upload</a>
+</div>
+
+<style>
+    .text-content {
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .summary-content {
+        background: #f1f1f1;
+        padding: 15px;
+        border-radius: 8px;
+    }
+    ul {
+        list-style: none;
+        padding: 0;
+    }
+    li {
+        margin-bottom: 10px;
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}

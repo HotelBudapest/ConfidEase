@@ -1,13 +1,17 @@
 from flask import Flask, render_template, request, redirect, url_for, send_file
 from extractor import extract_phrases
 from wordcloud import WordCloud
+from transformers import pipeline  # Hugging Face Summarization
+from collections import Counter
 import re
 import io
 import html
 import json
 import matplotlib.pyplot as plt
+from collections import Counter
 
 app = Flask(__name__)
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
 def escape_js_string(text):
     return html.escape(text).replace('\n', '\\n').replace('\r', '').replace("'", "\\'").replace('"', '\\"')
@@ -27,13 +31,17 @@ def highlight_phrases(text, phrases, selected_phrase=None):
         text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
     return text
 
-def get_word_positions(text):
-    """Generate a map of words and their positions in multi-word phrases"""
-    words_in_phrases = {}
-    words = text.split()
-    for i, word in enumerate(words):
-        words_in_phrases[i] = word
-    return words_in_phrases
+def summarize_keyword_in_context(text, keyword, max_length=50):
+    keyword_position = text.lower().find(keyword.lower())
+    if keyword_position != -1:
+        start = max(0, keyword_position - 100)
+        end = min(len(text), keyword_position + 100)
+        context = text[start:end]
+    else:
+        context = text
+    prompt = f"Explain the role of '{keyword}' in the following context: {context}"
+    summary = summarizer(prompt, max_length=30, min_length=5, do_sample=False)
+    return summary[0]['summary_text']
 
 @app.route('/')
 def index():
@@ -55,7 +63,6 @@ def extract_keywords():
 def visualize_phrases():
     text = request.args.get('text', '')
     phrases = request.args.getlist('phrases')
-    from collections import Counter
     frequencies = Counter(phrases)
     return render_template('cloud.html', phrases=phrases, text=text, frequencies=frequencies)
 
@@ -117,20 +124,39 @@ def phrase_list():
             text=request.args.get('text', ''),
             phrases=sorted(request.args.getlist('phrases')),
             frequencies=json.loads(request.args.get('frequencies', '{}')),
-            addressed_phrases=addressed_phrases
+            addressed_phrases=addressed_phrases,
+            summaries=json.loads(request.args.get('summaries', '{}'))
         )
+
     text = request.args.get('text', '')
     phrases = request.args.getlist('phrases')
-    from collections import Counter
     frequencies = Counter(phrases)
+    summaries = {}
+    for phrase in phrases:
+        summaries[phrase] = summarize_keyword_in_context(text, phrase)
 
     return render_template(
         'list.html', 
         text=text,
         phrases=sorted(frequencies.keys(), key=lambda x: frequencies[x], reverse=True),
         frequencies=frequencies,
-        addressed_phrases=set()
+        addressed_phrases=set(),
+        summaries=summaries
     )
+
+@app.route('/summarize_keywords', methods=['POST'])
+def summarize_keywords():
+    text = request.form.get('text', '')
+    phrases = json.loads(request.form.get('phrases', '[]'))
+
+    if not text or not phrases:
+        return "Error: Missing text or keywords", 400
+
+    summaries = {}
+    for phrase in phrases:
+        summaries[phrase] = summarize_keyword_in_context(text, phrase)
+
+    return render_template('summaries.html', text=text, summaries=summaries)
 
 if __name__ == '__main__':
     app.run(debug=True)
