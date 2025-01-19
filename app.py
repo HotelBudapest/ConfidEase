@@ -167,7 +167,7 @@ def phrase_list():
         addressed_phrases=set(),
         summaries=summaries
     )
-
+  
 @app.route('/')
 def index():
     return render_template('upload.html')
