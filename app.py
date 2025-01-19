@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 
 app = Flask(__name__)
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+summarizer = pipeline("text2text-generation", model="google/flan-t5-large")
 
 def escape_js_string(text):
     return html.escape(text).replace('\n', '\\n').replace('\r', '').replace("'", "\\'").replace('"', '\\"')
@@ -39,18 +39,135 @@ def get_word_positions(text):
         words_in_phrases[i] = word
     return words_in_phrases
 
-def summarize_keyword_in_context(text, keyword, max_length=50):
-    keyword_position = text.lower().find(keyword.lower())
-    if keyword_position != -1:
-        start = max(0, keyword_position - 100)
-        end = min(len(text), keyword_position + 100)
-        context = text[start:end]
-    else:
-        context = text
-    prompt = f"Explain the role of '{keyword}' in the following context: {context}"
-    summary = summarizer(prompt, max_length=30, min_length=5, do_sample=False)
-    return summary[0]['summary_text']
+def summarize_keyword_in_context(text, keyword, max_length=100):
+    """Summarize a single keyword in context."""
+    try:
+        keyword_position = text.lower().find(keyword.lower())
+        if keyword_position != -1:
+            start = max(0, keyword_position - 150)
+            end = min(len(text), keyword_position + 150)
+            context = text[start:end]
+        else:
+            context = text[:min(len(text), 300)]
 
+        # Improved prompt to get a more descriptive explanation
+        prompt = (
+            f"What is '{keyword}'? Provide a clear, brief explanation based on this context: {context}\n"
+            f"Respond with a 1-2 sentence definition that explains what {keyword} is and its main purpose."
+        )
+        
+        response = summarizer(prompt, max_length=max_length, do_sample=False)
+        summary = response[0]['generated_text'].strip()
+        
+        # Clean up the summary and ensure it's a proper explanation
+        summary = ' '.join(summary.split())
+        
+        # If the summary is too short or just repeats the keyword, try again with a different prompt
+        if len(summary) < 20 or summary.lower() == keyword.lower():
+            prompt = (
+                f"Define and explain what '{keyword}' is in 1-2 clear sentences, "
+                f"based on this context: {context}"
+            )
+            response = summarizer(prompt, max_length=max_length, do_sample=False)
+            summary = response[0]['generated_text'].strip()
+            summary = ' '.join(summary.split())
+
+        return summary
+
+    except Exception as e:
+        print(f"Error summarizing keyword '{keyword}': {e}")
+        return f"Unable to generate summary for '{keyword}'"
+
+def summarize_keywords_in_context(text, keywords, max_length=512):
+    """Summarize multiple keywords in context."""
+    try:
+        summaries = {}
+        
+        for keyword in keywords:
+            try:
+                # Get a window of text around each keyword occurrence
+                keyword_position = text.lower().find(keyword.lower())
+                if keyword_position != -1:
+                    start = max(0, keyword_position - 200)
+                    end = min(len(text), keyword_position + 200)
+                    context = text[start:end]
+                else:
+                    context = text[:min(len(text), 400)]
+
+                # Improved prompt for better explanations
+                prompt = (
+                    f"Based on this context, provide a clear 1-2 sentence explanation of what '{keyword}' is "
+                    f"and its main purpose or significance. Context: {context}"
+                )
+
+                response = summarizer(prompt, max_length=max_length, do_sample=False)
+                summary = response[0]['generated_text'].strip()
+                
+                # Clean up and validate the summary
+                summary = ' '.join(summary.split())
+                
+                # If the summary is too short or just repeats the keyword, try a different approach
+                if len(summary) < 20 or summary.lower() == keyword.lower():
+                    prompt = (
+                        f"Define and explain: What is '{keyword}' and what is it used for? "
+                        f"Answer in 1-2 clear sentences, based on this context: {context}"
+                    )
+                    response = summarizer(prompt, max_length=max_length, do_sample=False)
+                    summary = response[0]['generated_text'].strip()
+                    summary = ' '.join(summary.split())
+
+                summaries[keyword] = summary
+
+            except Exception as e:
+                print(f"Error processing keyword '{keyword}': {e}")
+                summaries[keyword] = f"Unable to analyze '{keyword}'"
+                continue
+
+        print("Generated summaries:", summaries)  # Debug output
+        return summaries
+
+    except Exception as e:
+        print(f"Error in summarize_keywords_in_context: {e}")
+        return {keyword: f"Error: {str(e)}" for keyword in keywords}
+
+# Then, define just ONE route for phrase_list
+@app.route('/phrase_list', methods=['GET', 'POST'])
+def phrase_list():
+    print("Debug - Entering phrase_list route")  # Debug output
+    
+    if request.method == 'POST':
+        addressed_phrases = request.form.getlist('addressed_phrases')
+        addressed_phrases = set(addressed_phrases)
+        return render_template(
+            'list.html',
+            text=request.args.get('text', ''),
+            phrases=sorted(request.args.getlist('phrases')),
+            frequencies=json.loads(request.args.get('frequencies', '{}')),
+            addressed_phrases=addressed_phrases,
+            summaries=json.loads(request.args.get('summaries', '{}'))
+        )
+
+    text = request.args.get('text', '')
+    phrases = request.args.getlist('phrases')
+    frequencies = Counter(phrases)
+
+    try:
+        print(f"Debug - Processing phrases: {phrases}")  # Debug output
+        summaries = summarize_keywords_in_context(text, phrases)
+        print(f"Debug - Generated summaries: {summaries}")  # Debug output
+    except Exception as e:
+        print(f"Error in phrase_list: {e}")
+        summaries = {phrase: f"Error generating summary" for phrase in phrases}
+
+    return render_template(
+        'list.html',
+        text=text,
+        phrases=sorted(frequencies.keys(), key=lambda x: frequencies[x], reverse=True),
+        frequencies=frequencies,
+        addressed_phrases=set(),
+        summaries=summaries
+    )
+  
 @app.route('/')
 def index():
     return render_template('upload.html')
@@ -121,36 +238,6 @@ def edit_phrases():
                          original_text=original_text, 
                          phrases=phrases,
                          words_info=words_info)
-
-@app.route('/phrase_list', methods=['GET', 'POST'])
-def phrase_list():
-    if request.method == 'POST':
-        addressed_phrases = request.form.getlist('addressed_phrases')
-        addressed_phrases = set(addressed_phrases)
-        return render_template(
-            'list.html', 
-            text=request.args.get('text', ''),
-            phrases=sorted(request.args.getlist('phrases')),
-            frequencies=json.loads(request.args.get('frequencies', '{}')),
-            addressed_phrases=addressed_phrases,
-            summaries=json.loads(request.args.get('summaries', '{}'))
-        )
-
-    text = request.args.get('text', '')
-    phrases = request.args.getlist('phrases')
-    frequencies = Counter(phrases)
-    summaries = {}
-    for phrase in phrases:
-        summaries[phrase] = summarize_keyword_in_context(text, phrase)
-
-    return render_template(
-        'list.html', 
-        text=text,
-        phrases=sorted(frequencies.keys(), key=lambda x: frequencies[x], reverse=True),
-        frequencies=frequencies,
-        addressed_phrases=set(),
-        summaries=summaries
-    )
 
 @app.route('/summarize_keywords', methods=['POST'])
 def summarize_keywords():
