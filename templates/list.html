@@ -2,6 +2,15 @@
 {% block content %}
 <h1 class="text-center mb-4">Phrase List</h1>
 
+{% if debug %}
+<div style="display: none;">
+    <pre>
+    Phrases: {{ phrases|tojson }}
+    Frequencies: {{ frequencies|tojson }}
+    Summaries: {{ summaries|tojson }}
+    </pre>
+</div>
+{% endif %}
 <form method="POST" action="{{ url_for('phrase_list', text=text, phrases=phrases|tojson, frequencies=frequencies|tojson, summaries=summaries|tojson) }}">
     <div class="phrase-list">
         {% for phrase in phrases %}
