@@ -32,7 +32,6 @@ def highlight_phrases(text, phrases, selected_phrase=None):
     return text
 
 def get_word_positions(text):
-    """Generate a map of words and their positions in multi-word phrases"""
     words_in_phrases = {}
     words = text.split()
     for i, word in enumerate(words):
@@ -40,7 +39,6 @@ def get_word_positions(text):
     return words_in_phrases
 
 def summarize_keyword_in_context(text, keyword, max_length=100):
-    """Summarize a single keyword in context."""
     try:
         keyword_position = text.lower().find(keyword.lower())
         if keyword_position != -1:
@@ -49,8 +47,6 @@ def summarize_keyword_in_context(text, keyword, max_length=100):
             context = text[start:end]
         else:
             context = text[:min(len(text), 300)]
-
-        # Improved prompt to get a more descriptive explanation
         prompt = (
             f"What is '{keyword}'? Provide a clear, brief explanation based on this context: {context}\n"
             f"Respond with a 1-2 sentence definition that explains what {keyword} is and its main purpose."
@@ -58,11 +54,7 @@ def summarize_keyword_in_context(text, keyword, max_length=100):
         
         response = summarizer(prompt, max_length=max_length, do_sample=False)
         summary = response[0]['generated_text'].strip()
-        
-        # Clean up the summary and ensure it's a proper explanation
         summary = ' '.join(summary.split())
-        
-        # If the summary is too short or just repeats the keyword, try again with a different prompt
         if len(summary) < 20 or summary.lower() == keyword.lower():
             prompt = (
                 f"Define and explain what '{keyword}' is in 1-2 clear sentences, "
@@ -85,7 +77,6 @@ def summarize_keywords_in_context(text, keywords, max_length=512):
         
         for keyword in keywords:
             try:
-                # Get a window of text around each keyword occurrence
                 keyword_position = text.lower().find(keyword.lower())
                 if keyword_position != -1:
                     start = max(0, keyword_position - 200)
@@ -93,8 +84,6 @@ def summarize_keywords_in_context(text, keywords, max_length=512):
                     context = text[start:end]
                 else:
                     context = text[:min(len(text), 400)]
-
-                # Improved prompt for better explanations
                 prompt = (
                     f"Based on this context, provide a clear 1-2 sentence explanation of what '{keyword}' is "
                     f"and its main purpose or significance. Context: {context}"
@@ -102,11 +91,7 @@ def summarize_keywords_in_context(text, keywords, max_length=512):
 
                 response = summarizer(prompt, max_length=max_length, do_sample=False)
                 summary = response[0]['generated_text'].strip()
-                
-                # Clean up and validate the summary
                 summary = ' '.join(summary.split())
-                
-                # If the summary is too short or just repeats the keyword, try a different approach
                 if len(summary) < 20 or summary.lower() == keyword.lower():
                     prompt = (
                         f"Define and explain: What is '{keyword}' and what is it used for? "
@@ -130,7 +115,6 @@ def summarize_keywords_in_context(text, keywords, max_length=512):
         print(f"Error in summarize_keywords_in_context: {e}")
         return {keyword: f"Error: {str(e)}" for keyword in keywords}
 
-# Then, define just ONE route for phrase_list
 @app.route('/phrase_list', methods=['GET', 'POST'])
 def phrase_list():
     print("Debug - Entering phrase_list route")  # Debug output
@@ -174,15 +158,18 @@ def index():
 
 @app.route('/extract', methods=['POST'])
 def extract_keywords():
-    if 'file' not in request.files:
+    original_text = request.form.get('text', '')
+    
+    if not original_text.strip():
         return redirect(request.url)
-    file = request.files['file']
-    if file.filename == '':
-        return redirect(request.url)
-    original_text = file.read().decode('utf-8')
     phrases = extract_phrases(original_text)
     highlighted_text = highlight_phrases(original_text, phrases)
-    return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases, original_text=original_text)
+    return render_template(
+        'results.html', 
+        highlighted_text=highlighted_text, 
+        phrases=phrases, 
+        original_text=original_text
+    )
 
 @app.route('/visualization')
 def visualize_phrases():
