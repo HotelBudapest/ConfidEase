@@ -4,37 +4,89 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Keyword Extractor</title>
+    <!-- Pixelated font for "ConfidEASE" -->
     <link
       href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
       rel="stylesheet"
     />
+    <!-- Tailwind CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
   </head>
-  <body class="bg-white text-dark">
-    <header 
-      class="sticky top-0 z-40 w-full border-b border-black bg-white"
-    >
+
+  <!-- body starts in light mode: .bg-white .text-black, toggled by .dark -->
+  <body class="bg-white text-black transition-colors duration-300">
+    
+    <!-- Sticky header with brand + dark mode switch -->
+    <header class="sticky top-0 z-40 w-full border-b border-black bg-white
+                   dark:bg-black dark:border-white transition-colors duration-300">
       <div class="flex h-16 items-center px-4 justify-between">
+        
+        <!-- Left side brand -->
         <div class="flex items-center space-x-2">
-        <span class="font-bold text-lg">
-          <span class="pixel-font" style="background-color: white; color: black;">Confid<span style="background-color: black; color: white;">EASE</span></span>
-        </span>
+          <span class="font-bold text-lg">
+            <!-- “ConfidEASE” with pixel font on “EASE” -->
+            <span class="pixel-font bg-white text-black dark:bg-black dark:text-white">
+              Confid<span class="bg-black text-white dark:bg-white dark:text-black">EASE</span>
+            </span>
+          </span>
         </div>
-        <nav class="flex items-center space-x-4">
-          <a href="#" class="text-sm font-medium text-black hover:underline">
-            Home
-          </a>
-          <a href="#" class="text-sm font-medium text-black hover:underline">
-            About
-          </a>
-          <a href="#" class="text-sm font-medium text-black hover:underline">
-            Contact
-          </a>
-        </nav>
+
+        <!-- Right side: Dark Mode Toggle (simple custom switch) -->
+        <div class="flex items-center space-x-2">
+          <label for="darkModeSwitch" class="text-sm font-medium dark:text-white">
+            Dark Mode
+          </label>
+          <div class="relative inline-flex items-center">
+            <!-- Actual checkbox input (hidden) -->
+            <input
+              id="darkModeSwitch"
+              type="checkbox"
+              class="sr-only peer"
+              onclick="toggleDarkMode()"
+            />
+            <!-- Background track -->
+            <div
+              class="w-11 h-6 bg-gray-300 peer-focus:outline-none
+                     peer-focus:ring-2 peer-focus:ring-black dark:peer-focus:ring-white
+                     rounded-full peer dark:bg-gray-600
+                     peer-checked:bg-black dark:peer-checked:bg-white
+                     transition-colors duration-300 ease-in-out"
+            ></div>
+            <!-- Thumb (the circle that slides) -->
+            <div
+              class="absolute left-0.5 top-0.5 w-5 h-5 bg-white dark:bg-black 
+                     border border-black dark:border-white 
+                     rounded-full transition-all duration-300 ease-in-out
+                     peer-checked:translate-x-5"
+            ></div>
+          </div>
+        </div>
       </div>
     </header>
+
+    <!-- Main content from child templates -->
     {% block content %}{% endblock %}
+
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
+
+    <!-- Script that toggles dark mode AND persists it -->
+    <script>
+      // Toggle the .dark class, then store the current mode
+      function toggleDarkMode() {
+        document.body.classList.toggle("dark")
+        // If dark is active, store 'true', else 'false'
+        localStorage.setItem("darkMode", document.body.classList.contains("dark"))
+      }
+
+      // On page load, read localStorage to see if user last had dark mode on
+      window.addEventListener("DOMContentLoaded", () => {
+        const savedMode = localStorage.getItem("darkMode")
+        if (savedMode === "true") {
+          document.body.classList.add("dark")
+          document.getElementById("darkModeSwitch").checked = true
+        }
+      })
+    </script>
   </body>
 </html>
