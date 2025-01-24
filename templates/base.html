@@ -1,16 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Keyword Extractor</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
-</head>
-<body class="bg-white text-dark">
-    <div class="container py-5">
-        {% block content %}{% endblock %}
-    </div>
+  </head>
+  <body class="bg-white text-dark">
+    <header 
+      class="sticky top-0 z-40 w-full border-b border-black bg-white"
+    >
+      <div class="flex h-16 items-center px-4 justify-between">
+        <div class="flex items-center space-x-2">
+        <span class="font-bold text-lg">
+          <span class="pixel-font" style="background-color: white; color: black;">Confid<span style="background-color: black; color: white;">EASE</span></span>
+        </span>
+        </div>
+        <nav class="flex items-center space-x-4">
+          <a href="#" class="text-sm font-medium text-black hover:underline">
+            Home
+          </a>
+          <a href="#" class="text-sm font-medium text-black hover:underline">
+            About
+          </a>
+          <a href="#" class="text-sm font-medium text-black hover:underline">
+            Contact
+          </a>
+        </nav>
+      </div>
+    </header>
+    {% block content %}{% endblock %}
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
-</body>
+  </body>
 </html>

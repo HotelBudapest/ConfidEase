@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+.pixel-font {
+  font-family: 'Press Start 2P', cursive;
+}
 @layer base {
   :root {
     --background: 0 0% 100%;
