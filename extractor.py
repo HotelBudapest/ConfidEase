@@ -51,4 +51,5 @@ def extract_phrases(
     flush_acc()
 
     unique_phrases = sorted(set(phrases))
+    print(unique_phrases)
     return unique_phrases

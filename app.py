@@ -20,15 +20,18 @@ app.jinja_env.filters['escapejs'] = escape_js_string
 
 def highlight_phrases(text, phrases, selected_phrase=None):
     phrases = sorted(phrases, key=len, reverse=True)
+    
     if selected_phrase:
-        pattern = r'\b' + re.escape(selected_phrase) + r'\b'
+        pattern = r'(?<![a-zA-Z0-9_])' + re.escape(selected_phrase) + r'(?![a-zA-Z0-9_])'
         repl = rf'<span class="highlight">{selected_phrase}</span>'
         text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
         return text
+    
     for phrase in phrases:
-        pattern = r'\b' + re.escape(phrase) + r'\b'
+        pattern = r'(?<![a-zA-Z0-9_])' + re.escape(phrase) + r'(?![a-zA-Z0-9_])'
         repl = rf'<span class="highlight">{phrase}</span>'
         text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
+    
     return text
 
 def get_word_positions(text):
