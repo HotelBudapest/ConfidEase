@@ -1,39 +1,110 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h1 class="text-center mb-4">Edit Key Phrases</h1>
-<form id="phrase-editor-form" method="POST" action="{{ url_for('edit_phrases') }}">
-    <input type="hidden" name="original_text" value="{{ original_text|escape }}">
-    <input type="hidden" id="updated-phrases" name="phrases" value="{{ phrases|tojson }}">
-    <div class="text-content" id="editor-container">
-    {% for word_info in words_info %}
-        <span class="editable {{ 'highlight' if word_info.in_phrase else '' }}" 
-              data-word="{{ word_info.word }}" 
-              data-phrase="{{ word_info.phrase }}">
+<!-- Outer Container -->
+<div class="w-screen h-screen bg-white dark:bg-black text-black dark:text-white transition-colors duration-300">
+
+  <!-- Page Header -->
+  <div class="border-b border-black dark:border-white py-4 px-6 transition-colors duration-300">
+    <h1 class="text-2xl font-bold text-center">Edit Key Phrases</h1>
+  </div>
+
+  <!-- Main Content -->
+  <div class="p-6">
+    <form id="phrase-editor-form" method="POST" action="{{ url_for('edit_phrases') }}">
+      <input type="hidden" name="original_text" value="{{ original_text|escape }}">
+      <input type="hidden" id="updated-phrases" name="phrases" value="{{ phrases|tojson }}">
+      
+      <!-- Editor Container -->
+      <div class="text-content border border-black dark:border-white rounded-md p-6 mb-6 
+                  bg-white dark:bg-black overflow-auto max-h-[60vh] transition-colors duration-300"
+           id="editor-container">
+        {% for word_info in words_info %}
+          <span class="editable {{ 'highlight' if word_info.in_phrase else '' }}" 
+                data-word="{{ word_info.word }}" 
+                data-phrase="{{ word_info.phrase }}">
             {{ word_info.word }}
             {% if word_info.in_phrase %}
-                <span class="remove-icon" onclick="removePhrase(this)">×</span>
+              <span class="remove-icon" onclick="removePhrase(this)">×</span>
             {% else %}
-                <span class="add-icon" onclick="addPhrase(this)">+</span>
+              <span class="add-icon" onclick="addPhrase(this)">+</span>
             {% endif %}
-        </span>
-        {% if loop.index < words_info|length - 1 %}
-            <span class="join-icon" 
-                  onclick="joinPhrases(this)" 
-                  data-current-word="{{ word_info.word }}" 
-                  data-next-word="{{ words_info[loop.index].word }}">+</span>
-        {% endif %}
-    {% endfor %}
-    </div>
-    <div class="text-center mt-4">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-        <a href="{{ url_for('highlight_phrase', original_text=original_text|escape, phrases=phrases|tojson) }}" 
-           class="btn btn-secondary">Cancel</a>
-    </div>
-</form>
+          </span>
+          {% if loop.index < words_info|length - 1 %}
+            {% if words_info[loop.index - 1].phrase and words_info[loop.index].phrase and words_info[loop.index - 1].phrase == words_info[loop.index].phrase %}
+              <span class="connector-icon">→</span>
+            {% else %}
+              <span class="join-icon" 
+                    onclick="joinPhrases(this)" 
+                    data-current-word="{{ word_info.word }}" 
+                    data-next-word="{{ words_info[loop.index].word }}">+</span>
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="flex justify-center gap-4">
+        <button type="submit" 
+                class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md
+                       bg-white dark:bg-black transition-colors duration-300">
+          <span class="absolute inset-0 -translate-x-full 
+                       bg-black dark:bg-white 
+                       group-hover:translate-x-0 transition-transform duration-300 ease-in-out"></span>
+          <span class="relative z-10 font-semibold
+                       text-black dark:text-white
+                       group-hover:text-white dark:group-hover:text-black">
+            Save Changes
+          </span>
+        </button>
+        
+        <a href="{{ url_for('highlight_phrase', original_text=original_text|escape, phrases=phrases|tojson) }}"
+           class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md
+                  bg-white dark:bg-black transition-colors duration-300">
+          <span class="absolute inset-0 -translate-x-full 
+                       bg-black dark:bg-white 
+                       group-hover:translate-x-0 transition-transform duration-300 ease-in-out"></span>
+          <span class="relative z-10 font-semibold
+                       text-black dark:text-white
+                       group-hover:text-white dark:group-hover:text-black">
+            Cancel
+          </span>
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script>
     let phrases = new Set({{ phrases|tojson }});
-    let multiWordPhrases = new Set([...phrases].filter(phrase => phrase.includes(' ')));
+    let multiWordPhrases = new Set();
+    
+    // Initialize multi-word phrases
+    function initializeMultiWordPhrases() {
+        phrases.forEach(phrase => {
+            if (phrase.includes(' ')) {
+                multiWordPhrases.add(phrase);
+            }
+        });
+        
+        // Apply connector arrows for multi-word phrases on page load
+        multiWordPhrases.forEach(phrase => {
+            const words = phrase.split(' ');
+            for (let i = 0; i < words.length - 1; i++) {
+                const currentWord = words[i];
+                const nextWord = words[i + 1];
+                
+                // Find join icons between these words
+                const joinIcons = document.querySelectorAll(`.join-icon[data-current-word="${currentWord}"][data-next-word="${nextWord}"]`);
+                joinIcons.forEach(icon => {
+                    icon.outerHTML = '<span class="connector-icon">→</span>';
+                });
+            }
+        });
+        
+        // Check for adjacent highlighted words that should show join icons
+        updateJoinIconsVisibility();
+    }
 
     function addPhrase(icon) {
         const wordElement = icon.parentElement;
@@ -41,6 +112,9 @@
         phrases.add(word);
         wordElement.classList.add('highlight');
         updatePhrasesInput();
+        
+        // Check if any join icons should be shown now
+        setTimeout(updateJoinIconsVisibility, 50);
     }
 
     function removePhrase(icon) {
@@ -51,15 +125,45 @@
         if (phrase) {
             phrases.delete(phrase);
             multiWordPhrases.delete(phrase);
+            
+            // Find all words that are part of this phrase
             phrase.split(' ').forEach(w => {
                 const elements = document.querySelectorAll(`[data-word="${w}"]`);
-                elements.forEach(el => el.classList.remove('highlight'));
+                elements.forEach(el => {
+                    el.classList.remove('highlight');
+                    el.removeAttribute('data-phrase');
+                });
             });
+            
+            // Replace connector arrows with join icons
+            const words = phrase.split(' ');
+            for (let i = 0; i < words.length - 1; i++) {
+                const currentWord = words[i];
+                const nextWord = words[i + 1];
+                
+                // Find connector icons between these words
+                const connectors = document.querySelectorAll(`.connector-icon`);
+                connectors.forEach(connector => {
+                    const prevElement = connector.previousElementSibling;
+                    const nextElement = connector.nextElementSibling;
+                    
+                    if (prevElement && nextElement && 
+                        prevElement.getAttribute('data-word') === currentWord && 
+                        nextElement.getAttribute('data-word') === nextWord) {
+                        connector.outerHTML = `<span class="join-icon" 
+                                                    onclick="joinPhrases(this)" 
+                                                    data-current-word="${currentWord}" 
+                                                    data-next-word="${nextWord}">+</span>`;
+                    }
+                });
+            }
         } else {
             phrases.delete(word);
             wordElement.classList.remove('highlight');
         }
+        
         updatePhrasesInput();
+        setTimeout(updateJoinIconsVisibility, 50);
     }
 
     function joinPhrases(icon) {
@@ -76,45 +180,87 @@
         // Highlight connected words
         const currentElements = document.querySelectorAll(`[data-word="${currentWord}"]`);
         const nextElements = document.querySelectorAll(`[data-word="${nextWord}"]`);
-        currentElements.forEach(el => el.classList.add('highlight'));
-        nextElements.forEach(el => el.classList.add('highlight'));
+        currentElements.forEach(el => {
+            el.classList.add('highlight');
+            el.setAttribute('data-phrase', newPhrase);
+        });
+        nextElements.forEach(el => {
+            el.classList.add('highlight');
+            el.setAttribute('data-phrase', newPhrase);
+        });
 
         // Replace join icon with connector arrow
         icon.outerHTML = '<span class="connector-icon">→</span>';
         
         updatePhrasesInput();
+        setTimeout(updateJoinIconsVisibility, 50);
     }
 
     function updatePhrasesInput() {
         document.getElementById('updated-phrases').value = JSON.stringify(Array.from(phrases));
     }
-
-    // Show join icon between two words
-    document.addEventListener('mouseover', function (event) {
-        if (event.target.classList.contains('join-icon')) {
-            const prevWord = event.target.getAttribute('data-current-word');
-            const nextWord = event.target.getAttribute('data-next-word');
-            const prevElements = document.querySelectorAll(`[data-word="${prevWord}"]`);
+    
+    // Function to update join icons visibility based on adjacent highlighted words
+    function updateJoinIconsVisibility() {
+        const allJoinIcons = document.querySelectorAll('.join-icon');
+        allJoinIcons.forEach(icon => {
+            const currentWord = icon.getAttribute('data-current-word');
+            const nextWord = icon.getAttribute('data-next-word');
+            
+            // Get the elements for these words
+            const currentElements = document.querySelectorAll(`[data-word="${currentWord}"]`);
             const nextElements = document.querySelectorAll(`[data-word="${nextWord}"]`);
-
-            // Only show join icon if both words are not already part of a single phrase
-            if (![...prevElements, ...nextElements].some(el => el.classList.contains('highlight'))) {
-                event.target.style.visibility = 'visible';
+            
+            // Check if both words are highlighted and not part of a multi-word phrase
+            const currentHighlighted = Array.from(currentElements).some(el => el.classList.contains('highlight'));
+            const nextHighlighted = Array.from(nextElements).some(el => el.classList.contains('highlight'));
+            
+            // Check if either word is part of a multi-word phrase
+            const isPartOfPhrase = [...currentElements, ...nextElements].some(el => {
+                const phrase = el.getAttribute('data-phrase');
+                return phrase && phrase.includes(' ');
+            });
+            
+            // Show join icon if both words are highlighted and not part of multi-word phrases
+            if (currentHighlighted && nextHighlighted && !isPartOfPhrase) {
+                icon.style.visibility = 'visible';
+                icon.classList.add('active-join-icon');
+            } else {
+                icon.style.visibility = 'hidden';
+                icon.classList.remove('active-join-icon');
             }
-        }
-    });
+        });
+    }
 
-    document.addEventListener('mouseout', function (event) {
+    // Event listeners for mouseover and mouseout
+    document.addEventListener('mouseover', function(event) {
         if (event.target.classList.contains('join-icon')) {
-            event.target.style.visibility = 'hidden';
+            // Only enhance visibility if already visible
+            if (event.target.style.visibility === 'visible') {
+                event.target.style.opacity = '1';
+                event.target.style.transform = 'scale(1.2)';
+            }
         }
     });
 
+    document.addEventListener('mouseout', function(event) {
+        if (event.target.classList.contains('join-icon')) {
+            // Return to normal (but still visible if it should be)
+            event.target.style.opacity = '0.8';
+            event.target.style.transform = 'scale(1)';
+        }
+    });
+
+    // Initialize on page load
     window.onload = function() {
-        phrases.forEach(phrase => {
-            if (phrase.includes(' ')) {
-                multiWordPhrases.add(phrase);
-            }
+        initializeMultiWordPhrases();
+        
+        // Add event listeners for highlighting/unhighlighting words
+        document.querySelectorAll('.add-icon, .remove-icon').forEach(icon => {
+            icon.addEventListener('click', function() {
+                // Wait a bit for the DOM to update before checking join icons
+                setTimeout(updateJoinIconsVisibility, 50);
+            });
         });
     };
 </script>
@@ -122,9 +268,6 @@
 <style>
     .text-content {
         line-height: 1.8;
-        padding: 20px;
-        background-color: #f8f9fa;
-        border-radius: 8px;
     }
 
     .editable {
@@ -132,15 +275,20 @@
         margin-right: 4px;
         padding: 2px 4px;
         border-radius: 4px;
-        transition: background-color 0.2s;
+        transition: all 0.2s;
         display: inline-block;
     }
 
+    /* Light/dark mode compatible highlighting */
     .highlight {
-        background-color: #fff3cd;
-        color: #856404;
-        font-weight: bold;
-        border: 1px solid #ffeeba;
+        background-color: rgba(255, 193, 7, 0.3);
+        font-weight: 500;
+        border: 1px solid rgba(255, 193, 7, 0.5);
+    }
+
+    .dark .highlight {
+        background-color: rgba(255, 193, 7, 0.2);
+        border: 1px solid rgba(255, 193, 7, 0.3);
     }
 
     .add-icon, .remove-icon, .join-icon {
@@ -148,27 +296,51 @@
         margin-left: 4px;
         visibility: hidden;
         display: inline-block;
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         text-align: center;
         line-height: 16px;
         border-radius: 50%;
+        font-weight: bold;
+        transition: all 0.2s;
     }
 
     .add-icon {
         color: #28a745;
-        background-color: #d4edda;
+        background-color: rgba(40, 167, 69, 0.2);
+    }
+    
+    .dark .add-icon {
+        color: #5dd879;
+        background-color: rgba(40, 167, 69, 0.1);
     }
 
     .remove-icon {
         color: #dc3545;
-        background-color: #f8d7da;
+        background-color: rgba(220, 53, 69, 0.2);
+    }
+    
+    .dark .remove-icon {
+        color: #ff6b7a;
+        background-color: rgba(220, 53, 69, 0.1);
     }
 
     .join-icon {
         color: #007bff;
-        background-color: #cce5ff;
+        background-color: rgba(0, 123, 255, 0.2);
         margin-left: -4px;
+        transition: transform 0.2s, opacity 0.2s;
+        opacity: 0.8;
+    }
+    
+    .dark .join-icon {
+        color: #5ea8ff;
+        background-color: rgba(0, 123, 255, 0.1);
+    }
+    
+    /* Active join icons are visible by default */
+    .active-join-icon {
+        visibility: visible !important;
     }
 
     .connector-icon {
@@ -176,11 +348,31 @@
         margin: 0 4px;
         font-weight: bold;
     }
+    
+    .dark .connector-icon {
+        color: #5ea8ff;
+    }
 
     .editable:hover .add-icon,
-    .highlight:hover .remove-icon,
-    .join-icon {
+    .highlight:hover .remove-icon {
         visibility: visible;
+    }
+    
+    .editable:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+    }
+    
+    .dark .editable:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    /* Prevent highlight hover effect from overriding highlight color */
+    .highlight:hover {
+        background-color: rgba(255, 193, 7, 0.3);
+    }
+    
+    .dark .highlight:hover {
+        background-color: rgba(255, 193, 7, 0.2);
     }
 </style>
 {% endblock %}
