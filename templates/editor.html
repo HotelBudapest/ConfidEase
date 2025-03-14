@@ -59,8 +59,7 @@
         </button>
         
         <a href="{{ url_for('highlight_phrase', original_text=original_text|escape, phrases=phrases|tojson) }}"
-           class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md
-                  bg-white dark:bg-black transition-colors duration-300">
+           class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md bg-white dark:bg-black transition-colors duration-300">
           <span class="absolute inset-0 -translate-x-full 
                        bg-black dark:bg-white 
                        group-hover:translate-x-0 transition-transform duration-300 ease-in-out"></span>
@@ -287,6 +286,7 @@
     }
 
     .dark .highlight {
+        color: rgb(255, 193, 7);
         background-color: rgba(255, 193, 7, 0.2);
         border: 1px solid rgba(255, 193, 7, 0.3);
     }
