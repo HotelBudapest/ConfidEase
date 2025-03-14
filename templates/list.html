@@ -1,95 +1,220 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h1 class="text-center mb-4">Phrase List</h1>
+<!-- Outer Container -->
+<div class="w-screen h-screen bg-white dark:bg-black text-black dark:text-white transition-colors duration-300">
 
-{% if debug %}
-<div style="display: none;">
-    <pre>
-    Phrases: {{ phrases|tojson }}
-    Frequencies: {{ frequencies|tojson }}
-    Summaries: {{ summaries|tojson }}
-    </pre>
-</div>
-{% endif %}
-<form method="POST" action="{{ url_for('phrase_list', text=text, phrases=phrases|tojson, frequencies=frequencies|tojson, summaries=summaries|tojson) }}">
-    <div class="phrase-list">
-        {% for phrase in phrases %}
-        <div class="phrase-item">
-            <input 
-                type="checkbox" 
-                name="addressed_phrases" 
-                value="{{ phrase }}" 
-                {% if phrase in addressed_phrases %} checked {% endif %}
-            >
-            <label>
-                <strong>{{ phrase }}</strong>
-                <small class="frequency">(Occurrences: {{ frequencies[phrase] }})</small>
-            </label>
-            {% if summaries[phrase] %}
-            <div class="summary">
-                <em>{{ summaries[phrase] }}</em>
-            </div>
-            {% else %}
-            <div class="summary">
-                <em>No summary available</em>
-            </div>
-            {% endif %}
+  <!-- Page Header -->
+  <div class="border-b border-black dark:border-white py-4 px-6 transition-colors duration-300">
+    <h1 class="text-2xl font-bold text-center">Key Phrases List</h1>
+  </div>
+
+  <!-- Main Content -->
+  <div class="p-6">
+    <form id="phrase-list-form" method="POST" action="{{ url_for('phrase_list') }}">
+      <input type="hidden" name="text" value="{{ text|escape }}">
+      <input type="hidden" name="cache_key" value="{{ cache_key }}">
+      
+      <!-- Phrase container -->
+      <div class="flex flex-col space-y-6">
+        <!-- Text Preview -->
+        <div class="text-content border border-black dark:border-white rounded-md p-6 mb-6 
+                    bg-white dark:bg-black overflow-auto max-h-[40vh] transition-colors duration-300">
+          <h2 class="text-xl font-semibold mb-4 border-b border-black dark:border-white pb-2">Text Preview</h2>
+          <p class="text-sm">{{ text|safe }}</p>
         </div>
-        {% endfor %}
-    </div>
+        
+        <!-- Phrases List -->
+        <div class="border border-black dark:border-white rounded-md p-6 
+                    bg-white dark:bg-black overflow-auto max-h-[40vh] transition-colors duration-300">
+          <h2 class="text-xl font-semibold mb-4 border-b border-black dark:border-white pb-2">Key Phrases</h2>
+          
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-black dark:border-white">
+                <th class="text-left py-2 px-4">Phrase</th>
+                <th class="text-left py-2 px-4">Occurrences</th>
+                <th class="text-left py-2 px-4">Summary</th>
+                <th class="text-center py-2 px-4">Status</th>
+                <th class="text-center py-2 px-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for phrase in phrases %}
+              <tr class="border-b border-black dark:border-white hover:bg-black hover:bg-opacity-5 dark:hover:bg-white dark:hover:bg-opacity-5 transition-colors duration-200 {{ 'addressed' if phrase in addressed_phrases else 'unaddressed' }}">
+                <td class="py-3 px-4">
+                  <span class="highlight inline-block px-2 py-1 rounded-md">{{ phrase }}</span>
+                </td>
+                <td class="py-3 px-4">{{ frequencies[phrase] }}</td>
+                <td class="py-3 px-4 text-sm">
+                  {% if summaries and phrase in summaries %}
+                    {{ summaries[phrase] }}
+                  {% else %}
+                    No summary available
+                  {% endif %}
+                </td>
+                <td class="py-3 px-4 text-center">
+                  <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" class="sr-only peer status-toggle" name="addressed_phrases" value="{{ phrase }}" 
+                           {% if phrase in addressed_phrases %}checked{% endif %}>
+                    <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 
+                              peer-focus:ring-yellow-300 dark:peer-focus:ring-yellow-800 rounded-full peer 
+                              dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white 
+                              after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white 
+                              after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 
+                              after:transition-all dark:border-gray-600 peer-checked:bg-yellow-500"></div>
+                    <span class="ml-3 text-sm font-medium">{{ 'Addressed' if phrase in addressed_phrases else 'Not addressed' }}</span>
+                  </label>
+                </td>
+                <td class="py-3 px-4 text-center">
+                  <a href="{{ url_for('highlight_phrase', original_text=text|escape, phrases=phrases|tojson, phrase=phrase) }}"
+                     class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200">
+                    View
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="flex justify-center gap-4 mt-6">
+        <button type="submit" id="save-status-btn"
+                class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md
+                       bg-white dark:bg-black transition-colors duration-300">
+          <span class="absolute inset-0 -translate-x-full 
+                       bg-black dark:bg-white 
+                       group-hover:translate-x-0 transition-transform duration-300 ease-in-out"></span>
+          <span class="relative z-10 font-semibold
+                       text-black dark:text-white
+                       group-hover:text-white dark:group-hover:text-black">
+            Save Status
+          </span>
+        </button>
+        
+        <a href="{{ url_for('visualize_phrases', text=text|escape, phrases=phrases) }}"
+           class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md bg-white dark:bg-black transition-colors duration-300">
+          <span class="absolute inset-0 -translate-x-full 
+                       bg-black dark:bg-white 
+                       group-hover:translate-x-0 transition-transform duration-300 ease-in-out"></span>
+          <span class="relative z-10 font-semibold
+                       text-black dark:text-white
+                       group-hover:text-white dark:group-hover:text-black">
+            Visualize
+          </span>
+        </a>
+        
+        <a href="{{ url_for('edit_phrases', original_text=text|escape, phrases=phrases) }}"
+           class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md bg-white dark:bg-black transition-colors duration-300">
+          <span class="absolute inset-0 -translate-x-full 
+                       bg-black dark:bg-white 
+                       group-hover:translate-x-0 transition-transform duration-300 ease-in-out"></span>
+          <span class="relative z-10 font-semibold
+                       text-black dark:text-white
+                       group-hover:text-white dark:group-hover:text-black">
+            Edit Phrases
+          </span>
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
 
-    <div class="text-center mt-4">
-        <button type="submit" class="btn btn-primary">Save</button>
-        <a href="{{ url_for('highlight_phrase', original_text=text, phrases=phrases|tojson) }}" class="btn btn-secondary">Back to Highlighted Text</a>
-    </div>
-</form>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for status toggles
+    const statusToggles = document.querySelectorAll('.status-toggle');
+    statusToggles.forEach(toggle => {
+      toggle.addEventListener('change', function() {
+        const row = this.closest('tr');
+        if (this.checked) {
+          row.classList.remove('unaddressed');
+          row.classList.add('addressed');
+          this.nextElementSibling.nextElementSibling.textContent = 'Addressed';
+        } else {
+          row.classList.remove('addressed');
+          row.classList.add('unaddressed');
+          this.nextElementSibling.nextElementSibling.textContent = 'Not addressed';
+        }
+      });
+    });
+    
+    // Auto-save functionality
+    const form = document.getElementById('phrase-list-form');
+    document.getElementById('save-status-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      // Create FormData and submit using fetch API
+      const formData = new FormData(form);
+      
+      fetch(form.action, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => {
+        if (response.ok) {
+          // Show success message
+          const successMsg = document.createElement('div');
+          successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg';
+          successMsg.textContent = 'Status saved successfully!';
+          document.body.appendChild(successMsg);
+          
+          // Remove after 2 seconds
+          setTimeout(() => {
+            successMsg.style.opacity = '0';
+            setTimeout(() => document.body.removeChild(successMsg), 300);
+          }, 2000);
+        }
+      })
+      .catch(error => console.error('Error:', error));
+    });
+  });
+</script>
 
 <style>
-    .phrase-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 20px;
-        justify-content: center;
-        padding: 20px;
-    }
+  /* Light/dark mode compatible highlighting */
+  .highlight {
+    background-color: rgba(255, 193, 7, 0.3);
+    font-weight: 500;
+    border: 1px solid rgba(255, 193, 7, 0.5);
+  }
 
-    .phrase-item {
-        display: flex;
-        flex-direction: column;
-        align-items: start;
-        padding: 10px 15px;
-        background: #f9f9f9;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin-bottom: 10px;
-        width: 300px;
-    }
-
-    .phrase-item input[type="checkbox"] {
-        margin-right: 10px;
-        transform: scale(1.3);
-    }
-
-    .phrase-item label {
-        display: flex;
-        flex-direction: column;
-        font-size: 1.1rem;
-        font-weight: bold;
-    }
-
-    .phrase-item .frequency {
-        font-size: 0.85rem;
-        color: #6c757d;
-    }
-
-    .phrase-item .summary {
-        margin-top: 10px;
-        font-size: 0.9rem;
-        color: #495057;
-    }
-
-    .btn {
-        margin: 10px;
-    }
+  .dark .highlight {
+    color: rgb(255, 193, 7);
+    background-color: rgba(255, 193, 7, 0.2);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+  }
+  
+  /* Addressed/Unaddressed styling */
+  tr.unaddressed .highlight {
+    border-left: 4px solid #ef4444; /* Red border for unaddressed */
+  }
+  
+  tr.addressed .highlight {
+    border-left: 4px solid #22c55e; /* Green border for addressed */
+  }
+  
+  /* Table styling */
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  
+  th, td {
+    border-bottom-width: 1px;
+  }
+  
+  tr:last-child td {
+    border-bottom: none;
+  }
+  
+  /* Transition for all elements */
+  * {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
 </style>
 {% endblock %}

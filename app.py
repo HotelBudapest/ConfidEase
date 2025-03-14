@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file
+from flask import Flask, render_template, request, redirect, url_for, send_file, session
 from extractor import extract_phrases
 from wordcloud import WordCloud
 from transformers import pipeline  # Hugging Face Summarization
@@ -9,14 +9,24 @@ import html
 import json
 import matplotlib.pyplot as plt
 from collections import Counter
+import hashlib
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key_here' 
 summarizer = pipeline("text2text-generation", model="google/flan-t5-large")
+
+summary_cache = {}
 
 def escape_js_string(text):
     return html.escape(text).replace('\n', '\\n').replace('\r', '').replace("'", "\\'").replace('"', '\\"')
 
 app.jinja_env.filters['escapejs'] = escape_js_string
+
+def generate_cache_key(text, phrases):
+    """Generate a unique cache key based on text and phrases."""
+    sorted_phrases = sorted(phrases)
+    key_content = text + '|' + '|'.join(sorted_phrases)
+    return hashlib.md5(key_content.encode()).hexdigest()
 
 def highlight_phrases(text, phrases, selected_phrase=None):
     phrases = sorted(phrases, key=len, reverse=True)
@@ -52,7 +62,8 @@ def summarize_keyword_in_context(text, keyword, max_length=100):
             context = text[:min(len(text), 300)]
         prompt = (
             f"What is '{keyword}'? Provide a clear, brief explanation based on this context: {context}\n"
-            f"Respond with a 1-2 sentence definition that explains what {keyword} is and its main purpose."
+            f"Respond with a 1-2 sentence definition that explains what {keyword} is and its main purpose.\n"
+            f"Your response should talk about how {keyword} means in the relevant industry of the context"
         )
         
         response = summarizer(prompt, max_length=max_length, do_sample=False)
@@ -73,13 +84,25 @@ def summarize_keyword_in_context(text, keyword, max_length=100):
         print(f"Error summarizing keyword '{keyword}': {e}")
         return f"Unable to generate summary for '{keyword}'"
 
-def summarize_keywords_in_context(text, keywords, max_length=512):
-    """Summarize multiple keywords in context."""
+def summarize_keywords_in_context(text, keywords, max_length=512, use_cache=True):
     try:
+        cache_key = generate_cache_key(text, keywords)
+        if use_cache and cache_key in summary_cache:
+            print("Using cached summaries")
+            return summary_cache[cache_key]
+        
+        print("Generating new summaries")
         summaries = {}
         
         for keyword in keywords:
             try:
+                keyword_cache_key = generate_cache_key(text, [keyword])
+                if use_cache and keyword_cache_key in summary_cache:
+                    keyword_summary = summary_cache[keyword_cache_key].get(keyword)
+                    if keyword_summary:
+                        summaries[keyword] = keyword_summary
+                        continue
+                
                 keyword_position = text.lower().find(keyword.lower())
                 if keyword_position != -1:
                     start = max(0, keyword_position - 200)
@@ -105,12 +128,15 @@ def summarize_keywords_in_context(text, keywords, max_length=512):
                     summary = ' '.join(summary.split())
 
                 summaries[keyword] = summary
+                
+                summary_cache[keyword_cache_key] = {keyword: summary}
 
             except Exception as e:
                 print(f"Error processing keyword '{keyword}': {e}")
                 summaries[keyword] = f"Unable to analyze '{keyword}'"
                 continue
-
+        summary_cache[cache_key] = summaries
+        
         print("Generated summaries:", summaries)  # Debug output
         return summaries
 
@@ -138,10 +164,16 @@ def phrase_list():
     phrases = request.args.getlist('phrases')
     frequencies = Counter(phrases)
 
+    cache_key = generate_cache_key(text, phrases)
+    
     try:
-        print(f"Debug - Processing phrases: {phrases}")  # Debug output
-        summaries = summarize_keywords_in_context(text, phrases)
-        print(f"Debug - Generated summaries: {summaries}")  # Debug output
+        if cache_key in summary_cache:
+            print(f"Debug - Using cached summaries with key: {cache_key}")
+            summaries = summary_cache[cache_key]
+        else:
+            print(f"Debug - Generating new summaries for key: {cache_key}")
+            summaries = summarize_keywords_in_context(text, phrases)
+            summary_cache[cache_key] = summaries
     except Exception as e:
         print(f"Error in phrase_list: {e}")
         summaries = {phrase: f"Error generating summary" for phrase in phrases}
@@ -237,11 +269,23 @@ def summarize_keywords():
     if not text or not phrases:
         return "Error: Missing text or keywords", 400
 
-    summaries = {}
-    for phrase in phrases:
-        summaries[phrase] = summarize_keyword_in_context(text, phrase)
+    cache_key = generate_cache_key(text, phrases)
+    if cache_key in summary_cache:
+        summaries = summary_cache[cache_key]
+    else:
+        summaries = {}
+        for phrase in phrases:
+            summaries[phrase] = summarize_keyword_in_context(text, phrase)
+        summary_cache[cache_key] = summaries
 
     return render_template('summaries.html', text=text, summaries=summaries)
+
+# Add route to clear cache (for testing/debugging)
+@app.route('/clear_cache')
+def clear_cache():
+    global summary_cache
+    summary_cache = {}
+    return "Cache cleared", 200
 
 if __name__ == '__main__':
     app.run(debug=True)
