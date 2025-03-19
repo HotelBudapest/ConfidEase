@@ -24,7 +24,7 @@ def extract_phrases(
     def valid_multi_word_chunk(tokens):
         if not any(t.pos_ in ("NOUN","PROPN") for t in tokens):
             return False
-        if len(tokens) == 2:
+        if len(tokens) >= 2:
             pos_tags = [t.pos_ for t in tokens]
             all_lower = all(t.text.islower() for t in tokens)
             if pos_tags == ["ADJ","NOUN"] and all_lower:

@@ -21,7 +21,7 @@
         <div class="text-content border border-black dark:border-white rounded-md p-6 mb-6 
                     bg-white dark:bg-black overflow-auto max-h-[40vh] transition-colors duration-300">
           <h2 class="text-xl font-semibold mb-4 border-b border-black dark:border-white pb-2">Text Preview</h2>
-          <p class="text-sm">{{ text|safe }}</p>
+          <p id="preview-text" class="text-sm">{{ text|safe }}</p>
         </div>
         
         <!-- Phrases List -->
@@ -67,10 +67,10 @@
                   </label>
                 </td>
                 <td class="py-3 px-4 text-center">
-                  <a href="{{ url_for('highlight_phrase', original_text=text|escape, phrases=phrases|tojson, phrase=phrase) }}"
-                     class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200">
+                  <button type="button" class="highlight-btn text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200"
+                          data-phrase="{{ phrase }}">
                     View
-                  </a>
+                  </button>
                 </td>
               </tr>
               {% endfor %}
@@ -81,20 +81,7 @@
       
       <!-- Action Buttons -->
       <div class="flex justify-center gap-4 mt-6">
-        <button type="submit" id="save-status-btn"
-                class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md
-                       bg-white dark:bg-black transition-colors duration-300">
-          <span class="absolute inset-0 -translate-x-full 
-                       bg-black dark:bg-white 
-                       group-hover:translate-x-0 transition-transform duration-300 ease-in-out"></span>
-          <span class="relative z-10 font-semibold
-                       text-black dark:text-white
-                       group-hover:text-white dark:group-hover:text-black">
-            Save Status
-          </span>
-        </button>
-        
-        <a href="{{ url_for('visualize_phrases', text=text|escape, phrases=phrases) }}"
+        <a href="{{ url_for('highlight_phrase', original_text=text|escape, phrases=phrases|tojson) }}"
            class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md bg-white dark:bg-black transition-colors duration-300">
           <span class="absolute inset-0 -translate-x-full 
                        bg-black dark:bg-white 
@@ -102,10 +89,9 @@
           <span class="relative z-10 font-semibold
                        text-black dark:text-white
                        group-hover:text-white dark:group-hover:text-black">
-            Visualize
+            Go Back
           </span>
         </a>
-        
         <a href="{{ url_for('edit_phrases', original_text=text|escape, phrases=phrases) }}"
            class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md bg-white dark:bg-black transition-colors duration-300">
           <span class="absolute inset-0 -translate-x-full 
@@ -124,7 +110,8 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    // Add event listeners for status toggles
+    const originalText = document.getElementById('preview-text').innerHTML;
+    const allPhrases = {{ phrases|tojson|safe }};
     const statusToggles = document.querySelectorAll('.status-toggle');
     statusToggles.forEach(toggle => {
       toggle.addEventListener('change', function() {
@@ -140,6 +127,65 @@
         }
       });
     });
+    
+    const highlightButtons = document.querySelectorAll('.highlight-btn');
+    highlightButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const selectedPhrase = this.getAttribute('data-phrase');
+        highlightSelectedPhrase(selectedPhrase);
+        document.querySelector('.text-content').scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+    
+    function highlightSelectedPhrase(selectedPhrase) {
+      let textContent = originalText;
+      const pattern = new RegExp(`(?<![a-zA-Z0-9_])(${escapeRegExp(selectedPhrase)})(?![a-zA-Z0-9_])`, 'gi');
+      
+      // Replace occurrences with highlighted version
+      textContent = textContent.replace(pattern, '<span class="active-highlight">$1</span>');
+      
+      // Set the modified text content
+      document.getElementById('preview-text').innerHTML = textContent;
+      
+      // Add a notification that shows which phrase is highlighted
+      showHighlightNotification(selectedPhrase);
+    }
+    
+    // Helper function to escape special regex characters
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    
+    // Function to show a notification about which phrase is highlighted
+    function showHighlightNotification(phrase) {
+      // Remove any existing notification
+      const existingNotification = document.getElementById('highlight-notification');
+      if (existingNotification) {
+        existingNotification.remove();
+      }
+      
+      // Create a new notification
+      const notification = document.createElement('div');
+      notification.id = 'highlight-notification';
+      notification.className = 'fixed top-4 right-4 bg-yellow-500 text-black px-4 py-2 rounded-md shadow-lg';
+      notification.innerHTML = `Highlighting: <strong>${phrase}</strong> <button class="ml-2 font-bold">×</button>`;
+      
+      // Add close button functionality
+      notification.querySelector('button').addEventListener('click', function() {
+        // Remove highlighting and restore original text
+        document.getElementById('preview-text').innerHTML = originalText;
+        notification.remove();
+      });
+      
+      document.body.appendChild(notification);
+      
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        if (document.getElementById('highlight-notification')) {
+          document.getElementById('highlight-notification').remove();
+        }
+      }, 5000);
+    }
     
     // Auto-save functionality
     const form = document.getElementById('phrase-list-form');
@@ -185,6 +231,22 @@
     color: rgb(255, 193, 7);
     background-color: rgba(255, 193, 7, 0.2);
     border: 1px solid rgba(255, 193, 7, 0.3);
+  }
+  
+  /* Special highlighting for the active phrase */
+  .active-highlight {
+    background-color: rgba(255, 105, 0, 0.3);
+    color: inherit;
+    font-weight: 700;
+    padding: 2px 1px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 105, 0, 0.6);
+  }
+  
+  .dark .active-highlight {
+    background-color: rgba(255, 105, 0, 0.3);
+    color: rgb(255, 165, 0);
+    border: 1px solid rgba(255, 105, 0, 0.4);
   }
   
   /* Addressed/Unaddressed styling */

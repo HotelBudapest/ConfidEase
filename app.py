@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, send_file, session
 from extractor import extract_phrases
 from wordcloud import WordCloud
-from transformers import pipeline  # Hugging Face Summarization
+from transformers import pipeline
 from collections import Counter
 import re
 import io
@@ -177,7 +177,6 @@ def phrase_list():
     except Exception as e:
         print(f"Error in phrase_list: {e}")
         summaries = {phrase: f"Error generating summary" for phrase in phrases}
-
     return render_template(
         'list.html',
         text=text,
@@ -280,7 +279,6 @@ def summarize_keywords():
 
     return render_template('summaries.html', text=text, summaries=summaries)
 
-# Add route to clear cache (for testing/debugging)
 @app.route('/clear_cache')
 def clear_cache():
     global summary_cache
