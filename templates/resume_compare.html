@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col min-h-screen bg-white dark:bg-black text-black dark:text-white transition-colors duration-300">
+  <!-- Header -->
+  <header class="py-6 px-4 sm:px-6 lg:px-8 border-b border-black dark:border-white">
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold">Resume Analysis Results</h1>
+      <div class="flex space-x-4">
+        <a href="{{ url_for('extract_keywords') }}" class="px-4 py-2 border border-black dark:border-white rounded-md transition-colors duration-300 hover:bg-gray-100 dark:hover:bg-gray-900">
+          Back to Keywords
+        </a>
+      </div>
+    </div>
+  </header>
+  
+  <!-- Main content -->
+  <main class="flex-grow p-4 sm:p-6 lg:p-8">
+    <!-- Summary Section with Donut Chart -->
+    <div class="mb-8 p-6 border border-black dark:border-white rounded-lg">
+      <h2 class="text-xl font-semibold mb-4">Match Summary</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Donut Chart Column -->
+        <div class="p-4 border border-black dark:border-white rounded-lg flex items-center justify-center">
+          <div class="relative" style="width: 160px; height: 160px;">
+            <canvas id="match-donut-chart" width="160" height="160"></canvas>
+            <div class="absolute inset-0 flex items-center justify-center flex-col">
+              <p class="text-4xl font-bold">{{ results.match_percentage }}%</p>
+              <p class="text-xs uppercase">matched</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border border-black dark:border-white rounded-lg text-center">
+          <p class="text-sm uppercase mb-1">Matched Keywords</p>
+          <p class="text-4xl font-bold">{{ results.matched_count }}/{{ results.total_keywords }}</p>
+        </div>
+        <div class="p-4 border border-black dark:border-white rounded-lg text-center">
+          <p class="text-sm uppercase mb-1">Resume Keywords</p>
+          <p class="text-4xl font-bold">{{ results.resume_keywords|length }}</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Keywords Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Matched Keywords -->
+      <div class="p-6 border border-black dark:border-white rounded-lg">
+        <h2 class="text-xl font-semibold mb-4">Matched Keywords</h2>
+        {% if results.matched_keywords %}
+          <ul class="space-y-2">
+            {% for keyword in results.matched_keywords %}
+              <li class="p-3 bg-green-50 dark:bg-green-900 rounded-md flex items-center">
+                <span class="mr-2">✓</span>
+                <span>{{ keyword }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-gray-500 dark:text-gray-400 text-center p-4">No matching keywords found</p>
+        {% endif %}
+      </div>
+      
+      <!-- Missing Keywords -->
+      <div class="p-6 border border-black dark:border-white rounded-lg">
+        <h2 class="text-xl font-semibold mb-4">Missing Keywords</h2>
+        {% if results.missing_keywords %}
+          <ul class="space-y-2">
+            {% for keyword in results.missing_keywords %}
+              <li class="p-3 bg-red-50 dark:bg-red-900 rounded-md flex items-center">
+                <span class="mr-2">✗</span>
+                <span>{{ keyword }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-gray-500 dark:text-gray-400 text-center p-4">No missing keywords! Your resume matches all the required keywords.</p>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Resume Keywords -->
+    <div class="mt-6 p-6 border border-black dark:border-white rounded-lg">
+      <h2 class="text-xl font-semibold mb-4">All Keywords Found in Your Resume</h2>
+      <div class="flex flex-wrap gap-2">
+        {% for keyword in results.resume_keywords %}
+          <span class="px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-md text-sm">{{ keyword }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const matchPercentage = {{ results.match_percentage }};
+    const missingPercentage = 100 - matchPercentage;
+    
+    const isDarkMode = document.documentElement.classList.contains('dark') || 
+                       window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    const ctx = document.getElementById('match-donut-chart').getContext('2d');
+    const matchDonutChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Matched', 'Missing'],
+        datasets: [{
+          data: [matchPercentage, missingPercentage],
+          backgroundColor: [
+            '#10B981', // Green for matched
+            isDarkMode ? '#1F2937' : '#E5E7EB' // Dark/light gray for missing
+          ],
+          borderWidth: 0,
+          cutout: '70%'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return context.label + ': ' + context.raw + '%';
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Update chart colors when dark mode changes
+    const darkModeObserver = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        if (mutation.attributeName === 'class') {
+          const isDark = document.documentElement.classList.contains('dark');
+          matchDonutChart.data.datasets[0].backgroundColor[1] = isDark ? '#1F2937' : '#E5E7EB';
+          matchDonutChart.update();
+        }
+      });
+    });
+    
+    darkModeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+  });
+</script>
+{% endblock %}

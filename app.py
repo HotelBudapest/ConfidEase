@@ -10,6 +10,9 @@ import json
 import matplotlib.pyplot as plt
 from collections import Counter
 import hashlib
+import os
+import tempfile
+from resume_matcher import ResumeJobMatcher
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here' 
@@ -205,6 +208,66 @@ def extract_keywords():
         original_text=original_text
     )
 
+@app.route('/upload_resume', methods=['GET'])
+def upload_resume():
+    original_text = request.args.get('original_text', '')
+    phrases = request.args.getlist('phrases')
+    
+    return render_template(
+        'resume_upload.html',
+        original_text=original_text,
+        phrases=phrases
+    )
+
+@app.route('/compare_resume', methods=['POST'])
+def compare_resume():
+    try:
+        original_text = request.form.get('original_text', '')
+        phrases_json = request.form.get('phrases', '[]')
+        
+        # Handle both string and list formats
+        if isinstance(phrases_json, str):
+            try:
+                phrases = json.loads(phrases_json)
+            except json.JSONDecodeError:
+                phrases = []
+        else:
+            phrases = phrases_json
+            
+        # Check if file was uploaded
+        if 'resume' not in request.files:
+            return redirect(url_for('extract_keywords'))
+            
+        resume_file = request.files['resume']
+        
+        # If no file selected
+        if resume_file.filename == '':
+            return redirect(url_for('extract_keywords'))
+            
+        # Create temp file for the PDF
+        temp_file = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+        temp_filename = temp_file.name
+        resume_file.save(temp_filename)
+        
+        # Process the resume
+        matcher = ResumeJobMatcher()
+        results = matcher.analyze_resume_for_job(temp_filename, original_text)
+        
+        # Clean up temp file
+        os.unlink(temp_filename)
+        
+        if not results:
+            return "Error processing resume", 500
+            
+        return render_template(
+            'resume_compare.html',
+            results=results
+        )
+        
+    except Exception as e:
+        print(f"Error in compare_resume: {str(e)}")
+        return f"An error occurred: {str(e)}", 500
+
 @app.route('/visualization')
 def visualize_phrases():
     text = request.args.get('text', '')
@@ -286,5 +349,4 @@ def clear_cache():
     return "Cache cleared", 200
 
 if __name__ == '__main__':
-    app.run(dubug=True)
-    # app.run(host='0.0.0.0', port=5001)
+    app.run(host='0.0.0.0', port=5001)

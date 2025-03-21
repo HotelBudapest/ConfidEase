@@ -3,59 +3,7 @@ import re
 import spacy
 from pypdf import PdfReader
 from collections import Counter
-
-def extract_phrases(
-    text,
-    model="en_core_web_sm",
-    keep_single_word=True,
-    top_n=None
-):
-    nlp = spacy.load(model)
-    doc = nlp(text)
-    phrases = []
-    accum_tokens = []
-    
-    ALLOWED_POS = {"PROPN", "NOUN", "ADJ", "VERB", "X"}
-    
-    def is_significant_single_word(token):
-        if token.ent_type_:
-            return True
-        if len(token.text) >= 4 and (token.text[0].isupper() or token.text.isupper()):
-            return True
-        return False
-    
-    def valid_multi_word_chunk(tokens):
-        if not any(t.pos_ in ("NOUN","PROPN") for t in tokens):
-            return False
-        if len(tokens) >= 2:
-            pos_tags = [t.pos_ for t in tokens]
-            all_lower = all(t.text.islower() for t in tokens)
-            if pos_tags == ["ADJ","NOUN"] and all_lower:
-                return False
-        return True
-    
-    def flush_acc():
-        if not accum_tokens:
-            return
-        if len(accum_tokens) > 1:
-            if valid_multi_word_chunk(accum_tokens):
-                phrase = " ".join(t.text for t in accum_tokens)
-                phrases.append(phrase)
-        else:
-            token = accum_tokens[0]
-            if keep_single_word and is_significant_single_word(token):
-                phrases.append(token.text)
-        accum_tokens.clear()
-    
-    for token in doc:
-        if token.pos_ in ALLOWED_POS and not token.is_stop:
-            accum_tokens.append(token)
-        else:
-            flush_acc()
-    
-    flush_acc()
-    unique_phrases = sorted(set(phrases))
-    return unique_phrases
+from extractor import extract_phrases
 
 class ResumeJobMatcher:
     def __init__(self, model="en_core_web_sm"):
@@ -115,6 +63,7 @@ class ResumeJobMatcher:
                 
                 if not found:
                     missing.append(keyword)
+        
         original_case_matches = []
         for match in matches:
             original_idx = [i for i, k in enumerate(job_keywords_lower) if k == match]
@@ -130,6 +79,7 @@ class ResumeJobMatcher:
                 original_case_missing.append(job_keywords[original_idx[0]])
             else:
                 original_case_missing.append(miss)
+        
         match_percentage = (len(matches) / len(job_keywords)) * 100 if job_keywords else 0
         
         return {
@@ -156,28 +106,3 @@ class ResumeJobMatcher:
         except Exception as e:
             print(f"Error analyzing resume against job description: {str(e)}")
             return None
-
-# if __name__ == "__main__":
-#     matcher = ResumeJobMatcher()
-#     job_description = """
-#     We are looking for a Python Developer with experience in Machine Learning and Natural Language Processing.
-#     The ideal candidate will have skills in:
-#     - Python programming
-#     - TensorFlow or PyTorch
-#     - Data analysis
-#     - SQL databases
-#     - RESTful APIs
-#     Familiarity with cloud platforms like AWS is a plus.
-#     """
-#     resume_path = "path/to/your/resume.pdf"
-#     results = matcher.analyze_resume_for_job(resume_path, job_description)
-#     if results:
-#         print("\n===== RESUME TO JOB MATCH RESULTS =====")
-#         print(f"Match percentage: {results['match_percentage']}%")
-#         print(f"Matched keywords ({results['matched_count']}/{results['total_keywords']}):")
-#         for keyword in results['matched_keywords']:
-#             print(f"✓ {keyword}")
-#
-#         print("\nMissing keywords:")
-#         for keyword in results['missing_keywords']:
-#             print(f"✗ {keyword}")
