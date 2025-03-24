@@ -1,12 +1,10 @@
 {% extends "base.html" %}
-
 {% block content %}
 <!-- 
   Full-height wrapper below the navbar, 
   ensures everything toggles from white to black in dark mode.
 -->
 <div class="min-h-[calc(100vh-4rem)] bg-white dark:bg-black text-black dark:text-white transition-colors duration-300 flex flex-col items-center py-8">
-
   <!-- Title & Intro Text -->
   <div class="text-center mb-6">
     <!-- Could also do: text-primary dark:text-primary-foreground if you have those tokens set -->
@@ -15,7 +13,6 @@
       Extract keywords by entering your text below.
     </p>
   </div>
-
   <!-- Form Container -->
   <div class="flex justify-center items-center w-full">
     <form
@@ -39,7 +36,6 @@
           required
         ></textarea>
       </div>
-
       <!-- Button flips black <-> white -->
       <button
         type="submit"
@@ -53,6 +49,156 @@
       </button>
     </form>
   </div>
+  
+  <!-- News Carousel Section -->
+  <div class="w-full max-w-4xl mt-12 mb-8">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold">Latest News in {{ selected_industry | title }}</h2>
+      <div class="flex items-center">
+        <form id="industryForm" method="get" action="{{ url_for('index') }}" class="mr-2">
+          <select name="industry" id="industry" onchange="this.form.submit()" 
+                  class="bg-white dark:bg-black border border-black dark:border-white rounded px-2 py-1 text-sm">
+            {% for industry in industries %}
+              <option value="{{ industry }}" {% if industry == selected_industry %}selected{% endif %}>
+                {{ industry | title }}
+              </option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    </div>
+    
+    {% if news_items %}
+    <div class="relative">
+      <!-- Carousel Controls - Now Above Carousel -->
+      <div class="flex justify-end space-x-2 mb-2">
+        <button id="prev-btn" class="bg-black dark:bg-white text-white dark:text-black rounded-full p-2 shadow-md hover:bg-black/90 dark:hover:bg-white/90">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+        <button id="next-btn" class="bg-black dark:bg-white text-white dark:text-black rounded-full p-2 shadow-md hover:bg-black/90 dark:hover:bg-white/90">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
+      </div>
 
+      <!-- Carousel container -->
+      <div class="overflow-hidden relative">
+        <div id="news-carousel" class="flex transition-transform duration-500 ease-in-out">
+          {% for item in news_items %}
+          <div class="news-card min-w-full md:min-w-[33.333%] p-2">
+            <div class="border border-black dark:border-white rounded-lg h-full overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              <div class="p-4 flex flex-col h-full">
+                {% if item.image %}
+                <div class="mb-3 h-40 overflow-hidden rounded">
+                  <img src="{{ item.image }}" alt="{{ item.title }}" class="w-full h-full object-cover"
+                       onerror="this.onerror=null; this.src='https://via.placeholder.com/300x200?text=No+Image';">
+                </div>
+                {% else %}
+                <div class="mb-3 h-40 overflow-hidden rounded">
+                  <img src="{{ url_for('static', filename='assets/placeholder.png') }}" alt="Placeholder" class="w-full h-full object-cover"
+                       onerror="this.src='https://via.placeholder.com/300x200?text=News';">
+                </div>
+                {% endif %}
+                <h3 class="font-bold text-base mb-2 line-clamp-2">{{ item.title }}</h3>
+                <p class="text-sm text-gray-700 dark:text-gray-300 mb-2 line-clamp-3">{{ item.summary }}</p>
+                <div class="mt-auto flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                  <span>{{ item.source }}</span>
+                  <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer" 
+                     class="text-blue-600 dark:text-blue-400 hover:underline">Read more</a>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="text-center py-8 border border-black dark:border-white rounded-lg">
+      <p>No news available at the moment.</p>
+    </div>
+    {% endif %}
+  </div>
 </div>
+
+<!-- Carousel JavaScript -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const carousel = document.getElementById('news-carousel');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const cards = document.querySelectorAll('.news-card');
+    
+    if (!carousel || cards.length === 0) return;
+    
+    let currentIndex = 0;
+    let cardsPerView = 1;
+    
+    // Determine cards per view based on screen size
+    function updateCardsPerView() {
+      if (window.innerWidth >= 768) {
+        cardsPerView = 3;
+      } else {
+        cardsPerView = 1;
+      }
+    }
+    
+    function updateCarousel() {
+      const cardWidth = 100 / cardsPerView;
+      cards.forEach(card => {
+        card.style.minWidth = `${cardWidth}%`;
+      });
+      
+      const offset = -1 * currentIndex * cardWidth;
+      carousel.style.transform = `translateX(${offset}%)`;
+    }
+    
+    function nextSlide() {
+      if (currentIndex + cardsPerView < cards.length) {
+        currentIndex++;
+        updateCarousel();
+      }
+    }
+    
+    function prevSlide() {
+      if (currentIndex > 0) {
+        currentIndex--;
+        updateCarousel();
+      }
+    }
+    
+    // Auto-play carousel
+    let autoplayInterval = setInterval(nextSlide, 5000);
+    
+    // Reset interval on manual navigation
+    function resetInterval() {
+      clearInterval(autoplayInterval);
+      autoplayInterval = setInterval(nextSlide, 5000);
+    }
+    
+    // Initialize
+    updateCardsPerView();
+    updateCarousel();
+    
+    // Event listeners
+    nextBtn.addEventListener('click', () => {
+      nextSlide();
+      resetInterval();
+    });
+    
+    prevBtn.addEventListener('click', () => {
+      prevSlide();
+      resetInterval();
+    });
+    
+    // Responsive handling
+    window.addEventListener('resize', () => {
+      updateCardsPerView();
+      updateCarousel();
+    });
+  });
+</script>
 {% endblock %}

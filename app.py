@@ -13,6 +13,7 @@ import hashlib
 import os
 import tempfile
 from resume_matcher import ResumeJobMatcher
+from news_fetcher import get_news_for_industry, get_available_industries
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here' 
@@ -191,7 +192,16 @@ def phrase_list():
   
 @app.route('/')
 def index():
-    return render_template('upload.html')
+    industries = get_available_industries()
+    selected_industry = request.args.get('industry', 'technology')
+    if selected_industry not in industries:
+        selected_industry = 'technology'
+    news_items = get_news_for_industry(selected_industry)
+    
+    return render_template('upload.html', 
+                          news_items=news_items, 
+                          selected_industry=selected_industry,
+                          industries=industries)
 
 @app.route('/extract', methods=['POST'])
 def extract_keywords():
