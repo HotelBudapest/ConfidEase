@@ -10,6 +10,10 @@ import json
 import matplotlib.pyplot as plt
 from collections import Counter
 import hashlib
+import os
+import tempfile
+from resume_matcher import ResumeJobMatcher
+from news_fetcher import get_news_for_industry, get_available_industries
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here' 
@@ -188,7 +192,16 @@ def phrase_list():
   
 @app.route('/')
 def index():
-    return render_template('upload.html')
+    industries = get_available_industries()
+    selected_industry = request.args.get('industry', 'technology')
+    if selected_industry not in industries:
+        selected_industry = 'technology'
+    news_items = get_news_for_industry(selected_industry)
+    
+    return render_template('upload.html', 
+                          news_items=news_items, 
+                          selected_industry=selected_industry,
+                          industries=industries)
 
 @app.route('/extract', methods=['POST'])
 def extract_keywords():
@@ -204,6 +217,66 @@ def extract_keywords():
         phrases=phrases, 
         original_text=original_text
     )
+
+@app.route('/upload_resume', methods=['GET'])
+def upload_resume():
+    original_text = request.args.get('original_text', '')
+    phrases = request.args.getlist('phrases')
+    
+    return render_template(
+        'resume_upload.html',
+        original_text=original_text,
+        phrases=phrases
+    )
+
+@app.route('/compare_resume', methods=['POST'])
+def compare_resume():
+    try:
+        original_text = request.form.get('original_text', '')
+        phrases_json = request.form.get('phrases', '[]')
+        
+        # Handle both string and list formats
+        if isinstance(phrases_json, str):
+            try:
+                phrases = json.loads(phrases_json)
+            except json.JSONDecodeError:
+                phrases = []
+        else:
+            phrases = phrases_json
+            
+        # Check if file was uploaded
+        if 'resume' not in request.files:
+            return redirect(url_for('extract_keywords'))
+            
+        resume_file = request.files['resume']
+        
+        # If no file selected
+        if resume_file.filename == '':
+            return redirect(url_for('extract_keywords'))
+            
+        # Create temp file for the PDF
+        temp_file = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+        temp_filename = temp_file.name
+        resume_file.save(temp_filename)
+        
+        # Process the resume
+        matcher = ResumeJobMatcher()
+        results = matcher.analyze_resume_for_job(temp_filename, original_text)
+        
+        # Clean up temp file
+        os.unlink(temp_filename)
+        
+        if not results:
+            return "Error processing resume", 500
+            
+        return render_template(
+            'resume_compare.html',
+            results=results
+        )
+        
+    except Exception as e:
+        print(f"Error in compare_resume: {str(e)}")
+        return f"An error occurred: {str(e)}", 500
 
 @app.route('/visualization')
 def visualize_phrases():
@@ -286,5 +359,4 @@ def clear_cache():
     return "Cache cleared", 200
 
 if __name__ == '__main__':
-    app.run(dubug=True)
-    # app.run(host='0.0.0.0', port=5001)
+    app.run(host='0.0.0.0', port=5001)

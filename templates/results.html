@@ -9,8 +9,8 @@
 
     <div class="flex-1 border border-black dark:border-white overflow-hidden
                 transition-colors duration-300">
-      <!-- 3 equal rows, with thin black line between them -->
-      <div class="grid grid-rows-3 h-full divide-y divide-black dark:divide-white">
+      <!-- 4 equal rows, with thin black line between them (added an extra row) -->
+      <div class="grid grid-rows-4 h-full divide-y divide-black dark:divide-white">
 
         <!-- Row 1 -->
         <a href="{{ url_for('visualize_phrases', text=original_text, phrases=phrases) }}"
@@ -55,6 +55,21 @@
                      text-black dark:text-white
                      group-hover:text-white dark:group-hover:text-black">
             Edit Phrases
+          </span>
+        </a>
+
+        <!-- Row 4 - Compare Your Resume - Fixed to properly pass params -->
+        <a href="{{ url_for('upload_resume', original_text=original_text, phrases=phrases) }}"
+           class="relative group block w-full h-full bg-white dark:bg-black overflow-hidden transition-colors duration-300">
+          <span class="absolute inset-0 -translate-x-full 
+                     bg-black dark:bg-white 
+                     group-hover:translate-x-0 transition-transform duration-300 ease-in-out">
+          </span>
+          <span class="relative z-10 flex items-center justify-center h-full
+                     text-lg font-semibold
+                     text-black dark:text-white
+                     group-hover:text-white dark:group-hover:text-black">
+            Compare Your Resume
           </span>
         </a>
       </div>

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .word-grid {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 2vw;
+        padding: 2vw;
+        overflow: hidden;
+    }
+
+    .word {
+        opacity: 0.2;
+        font-size: 5vw;
+        font-weight: 800;
+        transition: opacity 1s ease-in-out, text-shadow 1s ease-in-out;
+        color: rgb(156 163 175);
+        flex: 0 0 auto;
+    }
+
+    .dark .word {
+        color: rgb(173 181 189);
+    }
+
+    .word.active {
+        opacity: 1;
+        text-shadow: 0 0 20px rgba(255, 255, 255, 0.9), 0 0 40px rgba(255, 255, 255, 0.7);
+    }
+
+    .center-tile {
+        position: relative;
+        z-index: 10;
+        padding: 4vw;
+        border-radius: 1vw;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        text-align: center;
+        border: 1px solid black;
+        max-width: 80vw;
+        background-color: white;
+        color: black;
+    }
+
+    .dark .center-tile {
+        background-color: black;
+        color: white;
+        border-color: white;
+    }
+
+    .center-tile h1 {
+        font-size: 6vw;
+        font-weight: 700;
+        margin-bottom: 2vw;
+    }
+
+    .center-tile button {
+        background-color: black;
+        color: white;
+        font-weight: 700;
+        padding: 1vw 2vw;
+        border-radius: 0.5vw;
+        transition: opacity 0.3s ease;
+    }
+
+    .dark .center-tile button {
+        background-color: white;
+        color: black;
+    }
+
+    .center-tile button:hover {
+        opacity: 0.8;
+    }
+</style>
+
+<div class="relative min-h-[calc(100vh-4rem)] flex items-center justify-center">
+    <div class="word-grid">
+        {% for _ in range(7) %}
+            {% for word in ["Resume", "Interview", "Job", "Skills", "Apply", "Network", "Career"] %}
+                <span class="word">{{ word }}</span>
+            {% endfor %}
+        {% endfor %}
+    </div>
+    <div class="center-tile">
+        <h1 class="pixel-font">ConfidEase</h1>
+        <button onclick="window.location.href='/upload'">Get Started</button>
+    </div>
+</div>
+
+<script>
+    function animateWords() {
+        const words = Array.from(document.querySelectorAll('.word'));
+        words.forEach(word => word.classList.remove('active'));
+        const randomWords = words.sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 2) + 1);
+        requestAnimationFrame(() => {
+            randomWords.forEach(word => word.classList.add('active'));
+        });
+    }
+
+    setInterval(animateWords, 1500);
+    animateWords();
+</script>
+{% endblock %}

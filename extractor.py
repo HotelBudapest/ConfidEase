@@ -1,4 +1,8 @@
+import os
+import re
 import spacy
+from pypdf import PdfReader
+from collections import Counter
 
 def extract_phrases(
     text,
@@ -8,19 +12,18 @@ def extract_phrases(
 ):
     nlp = spacy.load(model)
     doc = nlp(text)
-
     phrases = []
     accum_tokens = []
     
     ALLOWED_POS = {"PROPN", "NOUN", "ADJ", "VERB", "X"}
-
+    
     def is_significant_single_word(token):
         if token.ent_type_:
             return True
         if len(token.text) >= 4 and (token.text[0].isupper() or token.text.isupper()):
             return True
         return False
-
+    
     def valid_multi_word_chunk(tokens):
         if not any(t.pos_ in ("NOUN","PROPN") for t in tokens):
             return False
@@ -30,7 +33,7 @@ def extract_phrases(
             if pos_tags == ["ADJ","NOUN"] and all_lower:
                 return False
         return True
-
+    
     def flush_acc():
         if not accum_tokens:
             return
@@ -43,13 +46,13 @@ def extract_phrases(
             if keep_single_word and is_significant_single_word(token):
                 phrases.append(token.text)
         accum_tokens.clear()
+    
     for token in doc:
         if token.pos_ in ALLOWED_POS and not token.is_stop:
             accum_tokens.append(token)
         else:
             flush_acc()
+    
     flush_acc()
-
     unique_phrases = sorted(set(phrases))
-    print(unique_phrases)
     return unique_phrases
