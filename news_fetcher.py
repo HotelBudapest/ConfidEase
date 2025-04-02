@@ -79,9 +79,8 @@ INDUSTRIES = {
     ]
 }
 
-# Cache setup - store news for 30 minutes to avoid hitting APIs too frequently
 NEWS_CACHE = {}
-CACHE_DURATION = 30 * 60  # 30 minutes in seconds
+CACHE_DURATION = 30 * 60
 
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -91,7 +90,6 @@ USER_AGENTS = [
 ]
 
 def get_cached_news(industry):
-    """Get news from cache if available and not expired"""
     if industry in NEWS_CACHE:
         timestamp, news = NEWS_CACHE[industry]
         if datetime.datetime.now().timestamp() - timestamp < CACHE_DURATION:
@@ -106,31 +104,22 @@ def clean_html(text):
     """Clean HTML tags and entities from text"""
     if not text:
         return ""
-    # First unescape HTML entities
     text = html.unescape(text)
-    # Remove HTML tags
     text = re.sub(r'<[^>]+>', ' ', text)
-    # Remove excess whitespace
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 def extract_image(entry):
-    """Extract image URL from feed entry using multiple methods"""
-    # Try multiple approaches to find an image
-    
-    # Method 1: Look in media_content
     if hasattr(entry, 'media_content') and entry.media_content:
         for media in entry.media_content:
             if 'url' in media:
                 return media['url']
     
-    # Method 2: Look in media_thumbnail
     if hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
         for media in entry.media_thumbnail:
             if 'url' in media:
                 return media['url']
     
-    # Method 3: Look in enclosures
     if hasattr(entry, 'enclosures') and entry.enclosures:
         for enclosure in entry.enclosures:
             if 'href' in enclosure and enclosure.get('type', '').startswith('image/'):
@@ -138,7 +127,6 @@ def extract_image(entry):
             if 'url' in enclosure and enclosure.get('type', '').startswith('image/'):
                 return enclosure['url']
     
-    # Method 4: Look in content
     if hasattr(entry, 'content') and entry.content:
         for content in entry.content:
             if 'value' in content:
@@ -147,7 +135,6 @@ def extract_image(entry):
                 if img and img.get('src'):
                     return img['src']
     
-    # Method 5: Look in summary or description
     for field in ['summary', 'description']:
         if hasattr(entry, field) and getattr(entry, field):
             soup = BeautifulSoup(getattr(entry, field), 'html.parser')
@@ -155,24 +142,19 @@ def extract_image(entry):
             if img and img.get('src'):
                 return img['src']
     
-    # Method 6: Look for image in links
     if hasattr(entry, 'links'):
         for link in entry.links:
             if link.get('type', '').startswith('image/'):
                 return link.get('href')
-    
-    # No image found
     return None
 
 def get_entry_date(entry):
-    """Extract and standardize date from entry"""
     for date_field in ['published', 'pubDate', 'updated', 'created', 'date']:
         if hasattr(entry, date_field) and getattr(entry, date_field):
             return getattr(entry, date_field)
     return 'N/A'
 
 def fetch_feed_with_timeout(feed_url, timeout_seconds=10):
-    """Fetch RSS feed with timeout and rotating user agents"""
     headers = {
         'User-Agent': random.choice(USER_AGENTS),
         'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, text/html',
@@ -181,11 +163,8 @@ def fetch_feed_with_timeout(feed_url, timeout_seconds=10):
     }
     
     try:
-        # Use requests with timeout for the initial fetch
         response = requests.get(feed_url, timeout=timeout_seconds, headers=headers)
         response.raise_for_status()  # Raise exception for 4XX/5XX responses
-        
-        # Parse the feed content
         feed = feedparser.parse(response.content)
         if feed and hasattr(feed, 'entries') and feed.entries:
             logger.info(f"Successfully fetched {len(feed.entries)} entries from {feed_url}")
@@ -194,8 +173,6 @@ def fetch_feed_with_timeout(feed_url, timeout_seconds=10):
             logger.warning(f"Feed successfully fetched but no entries found in {feed_url}")
     except requests.exceptions.RequestException as e:
         logger.warning(f"Request error for {feed_url}: {e}")
-    
-    # Fallback to direct parsing if request fails
     try:
         logger.info(f"Trying direct feedparser on {feed_url}")
         feed = feedparser.parse(feed_url)
@@ -210,8 +187,6 @@ def fetch_feed_with_timeout(feed_url, timeout_seconds=10):
     return None
 
 def fetch_news(industry):
-    """Fetch news for a specific industry from RSS feeds with improved parsing"""
-    # Check cache first
     cached_news = get_cached_news(industry)
     if cached_news:
         logger.info(f"Returning {len(cached_news)} cached news items for {industry}")
@@ -224,33 +199,23 @@ def fetch_news(industry):
     logger.info(f"Fetching fresh news for {industry}")
     news_items = []
     successful_feeds = 0
-    
-    # Try to get at least 10 news items from all available sources
     for feed_url in INDUSTRIES[industry]:
-        # If we already have enough news items, break
         if len(news_items) >= 15 and successful_feeds >= 2:
             logger.info(f"Already have {len(news_items)} items from {successful_feeds} feeds, stopping fetch")
             break
             
         try:
-            # Fetch feed with timeout
             feed = fetch_feed_with_timeout(feed_url)
             if not feed:
                 continue
-            
-            # Get source name
             source_name = feed.feed.get('title', feed_url.split('/')[2])
             if not source_name or source_name.strip() == '':
                 source_name = feed_url.split('/')[2].replace('www.', '')
             
-            # Counter for items from this feed
             items_from_feed = 0
             
             for entry in feed.entries[:5]:  # Get top 5 news from each source
-                # Extract image
                 image_url = extract_image(entry)
-                
-                # Get summary
                 summary = ''
                 for field in ['summary', 'description', 'content']:
                     if hasattr(entry, field) and getattr(entry, field):
@@ -261,26 +226,20 @@ def fetch_news(industry):
                             summary = content_value
                         break
                 
-                # Clean summary
                 clean_summary = clean_html(summary)
                 if clean_summary:
-                    # Limit summary length
                     clean_summary = clean_summary[:200] + ('...' if len(clean_summary) > 200 else '')
                 
-                # Get title
                 title = clean_html(entry.get('title', 'No Title'))
                 if not title or title.strip() == '':
                     continue
                 
-                # Get link
                 link = entry.get('link', '#')
                 if not link or link == '#':
                     continue
                 
-                # Get publication date
                 published = get_entry_date(entry)
                 
-                # Check for duplicates (based on title similarity)
                 duplicate = False
                 for existing in news_items:
                     if existing['title'].lower() == title.lower():
@@ -307,21 +266,17 @@ def fetch_news(industry):
     
     logger.info(f"Total news items fetched for {industry}: {len(news_items)}")
     
-    # If we have news items, cache them
     if news_items:
         cache_news(industry, news_items)
         return news_items
     
-    # If we have no news items but cache exists, return the expired cache as a fallback
     if industry in NEWS_CACHE:
         logger.warning(f"No fresh news for {industry}, returning expired cache")
         return NEWS_CACHE[industry][1]
     
-    # Last resort - try to get general news
     return fetch_general_news()
 
 def fetch_general_news():
-    """Fetch general news as a fallback when industry-specific news fails"""
     logger.info("Fetching general news as fallback")
     general_feeds = [
         "https://news.google.com/rss",
@@ -341,14 +296,12 @@ def fetch_general_news():
             source_name = feed.feed.get('title', feed_url.split('/')[2])
             
             for entry in feed.entries[:3]:  # Get top 3 news from each general source
-                # Process entry similar to fetch_news function
                 image_url = extract_image(entry)
                 
                 title = clean_html(entry.get('title', 'No Title'))
                 link = entry.get('link', '#')
                 published = get_entry_date(entry)
                 
-                # Get summary
                 summary = ''
                 for field in ['summary', 'description', 'content']:
                     if hasattr(entry, field) and getattr(entry, field):
@@ -378,9 +331,7 @@ def fetch_general_news():
     return news_items
 
 def get_news_for_industry(industry='technology'):
-    """Main function to get news for a specific industry"""
     return fetch_news(industry)
 
 def get_available_industries():
-    """Return list of available industries"""
     return sorted(INDUSTRIES.keys())
