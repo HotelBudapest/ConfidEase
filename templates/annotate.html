@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 space-y-4 bg-white dark:bg-black text-black dark:text-white">
+  <h1 class="text-2xl font-bold">Annotate Your Resume</h1>
+  <p class="italic">Click on four lines in order:<br>
+    1) Skills start   2) Skills end   3) Work start   4) Work end</p>
+
+  <div id="resume-container"
+       class="border p-4 overflow-auto max-h-[60vh] bg-gray-50 dark:bg-gray-900">
+    {% for line in lines %}
+      <div class="line py-1 cursor-pointer transition hover:bg-yellow-100 dark:hover:bg-yellow-900"
+           data-line="{{ loop.index0 }}">
+        {{ line }}
+      </div>
+    {% endfor %}
+  </div>
+
+  <form method="POST" action="{{ url_for('annotate_resume') }}" class="space-y-4">
+    <input type="hidden" name="skills_start" id="skills_start">
+    <input type="hidden" name="skills_end"   id="skills_end">
+    <input type="hidden" name="work_start"   id="work_start">
+    <input type="hidden" name="work_end"     id="work_end">
+
+    <div id="status" class="font-medium">Click your first line (Skills start)</div>
+    <button type="submit"
+            class="mt-4 px-4 py-2 bg-green-600 text-white rounded"
+            id="confirm-btn"
+            disabled>
+      Confirm Selections
+    </button>
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const inputs = ['skills_start','skills_end','work_start','work_end'];
+  let step = 0;
+  const status = document.getElementById('status');
+  const confirmBtn = document.getElementById('confirm-btn');
+
+  const lines = Array.from(document.querySelectorAll('.line'));
+  lines.forEach(el => {
+    el.addEventListener('click', () => {
+      if (step >= inputs.length) return;               // all done
+      const field = inputs[step];
+      document.getElementById(field).value = el.dataset.line;
+      el.classList.add('bg-green-300');               // highlight it
+      step++;
+      if (step < inputs.length) {
+        const names = ['Skills start','Skills end','Work start','Work end'];
+        status.textContent = `Click your next line (${names[step]})`;
+      } else {
+        status.textContent = 'All selections made. You may confirm.';
+        confirmBtn.disabled = false;
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

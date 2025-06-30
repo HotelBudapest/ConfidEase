@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="min-h-[calc(100vh-4rem)] flex flex-col items-center py-8
+            bg-white dark:bg-black text-black dark:text-white">
+  <h1 class="text-3xl font-bold mb-6">Jobs Dashboard</h1>
+
+  <!-- Add new job form -->
+  <form action="{{ url_for('jobs') }}" method="POST"
+        class="w-full max-w-xl mb-8 p-6 border border-black dark:border-white rounded-lg">
+    <label for="job_text" class="block mb-2 font-medium">Paste a Job Description</label>
+    <textarea id="job_text" name="job_text" rows="5"
+              class="w-full border border-black dark:border-white rounded-md p-2 mb-4 bg-white dark:bg-black text-black dark:text-white"
+              placeholder="Enter full job description…"></textarea>
+    <button type="submit"
+            class="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-md">
+      Add Job
+    </button>
+  </form>
+
+  <!-- List of saved jobs -->
+  <div class="w-full max-w-2xl space-y-4">
+    {% if jobs %}
+      {% for job in jobs %}
+        <div class="p-4 border border-black dark:border-white rounded-lg flex flex-col md:flex-row md:items-center justify-between">
+          <p class="flex-1 text-sm mb-4 md:mb-0">
+            {{ job[:100] }}{% if job|length > 100 %}…{% endif %}
+          </p>
+          <div class="flex space-x-2">
+            <!-- Analyze button: POST to /extract -->
+            <form action="{{ url_for('extract_keywords') }}" method="POST">
+              <input type="hidden" name="text" value="{{ job|e }}">
+              <button type="submit"
+                      class="px-3 py-1 border border-black dark:border-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                Analyze
+              </button>
+            </form>
+            <!-- Delete button -->
+            <form action="{{ url_for('delete_job', index=loop.index0) }}" method="POST">
+              <button type="submit"
+                      class="px-3 py-1 border border-red-500 text-red-500 rounded-md hover:bg-red-100 dark:hover:bg-red-900 transition">
+                Delete
+              </button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-center text-gray-500">No jobs added yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

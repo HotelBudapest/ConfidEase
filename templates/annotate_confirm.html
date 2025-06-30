@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 bg-white dark:bg-black text-black dark:text-white space-y-6">
+  <h1 class="text-2xl font-bold">Confirm Your Sections</h1>
+
+  <div>
+    <h2 class="text-xl font-semibold">Skills Section</h2>
+    <pre class="border p-4 bg-gray-50 dark:bg-gray-900">{{ skills|join('\n') }}</pre>
+  </div>
+
+  <div>
+    <h2 class="text-xl font-semibold">Work Experience Section</h2>
+    <pre class="border p-4 bg-gray-50 dark:bg-gray-900">{{ work|join('\n') }}</pre>
+  </div>
+
+  <a href="{{ url_for('extract_keywords') }}"
+     class="px-4 py-2 border rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+    Go Back & Re-Annotate
+  </a>
+  <a href="{{ url_for('generate_cv') }}"
+     class="px-4 py-2 bg-blue-600 text-white rounded">
+    Next: Inject Keywords & Generate CV
+  </a>
+</div>
+{% endblock %}
