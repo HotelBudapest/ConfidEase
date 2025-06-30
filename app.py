@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, send_file, session
+import uuid
 from extractor import extract_phrases
 from wordcloud import WordCloud
 from transformers import pipeline
@@ -14,17 +15,87 @@ import os
 import tempfile
 from resume_matcher import ResumeJobMatcher
 from news_fetcher import get_news_for_industry, get_available_industries
+import pdfplumber
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here' 
 summarizer = pipeline("text2text-generation", model="google/flan-t5-large")
 
 summary_cache = {}
+_resume_store = {}
+
+def get_jobs():
+    return session.setdefault('jobs', [])
+
+@app.route('/')
+def root():
+    return redirect(url_for('jobs'))
+
+@app.route('/jobs', methods=['GET', 'POST'])
+def jobs():
+    jobs = get_jobs()
+    if request.method == 'POST':
+        new_text = request.form.get('job_text', '').strip()
+        if new_text:
+            jobs.append(new_text)
+            session['jobs'] = jobs
+        return redirect(url_for('jobs'))
+
+    return render_template('jobs.html', jobs=jobs)
+
+@app.route('/jobs/delete/<int:index>', methods=['POST'])
+def delete_job(index):
+    jobs = get_jobs()
+    if 0 <= index < len(jobs):
+        jobs.pop(index)
+        session['jobs'] = jobs
+    return redirect(url_for('jobs'))
 
 def escape_js_string(text):
     return html.escape(text).replace('\n', '\\n').replace('\r', '').replace("'", "\\'").replace('"', '\\"')
 
 app.jinja_env.filters['escapejs'] = escape_js_string
+
+
+@app.route('/annotate_resume', methods=['GET'])
+def annotate_resume():
+    raw = session.get('resume_text', '')
+    lines = _resume_store.get(session.get('resume_key'), [])
+    return render_template('annotate.html', lines=lines)
+
+@app.route('/annotate_resume', methods=['POST'])
+def annotate_resume_post():
+    bounds = {
+      'skills_start': int(request.form['skills_start']),
+      'skills_end':   int(request.form['skills_end']),
+      'work_start':   int(request.form['work_start']),
+      'work_end':     int(request.form['work_end']),
+    }
+    session['section_bounds'] = bounds
+    return redirect(url_for('annotate_confirm'))
+
+@app.route('/generate_cv')
+def generate_cv():
+    # TODO: hook this up to your LaTeX-compile pipeline
+    return "PDF generation not yet implemented", 200
+
+@app.route('/annotate_confirm')
+def annotate_confirm():
+    key = session.get('resume_key')
+    if not key or key not in _resume_store:
+        return "No resume loaded", 400
+
+    lines = _resume_store[key]
+    b = session.get('section_bounds', {})
+    if not all(k in b for k in ('skills_start','skills_end','work_start','work_end')):
+        return redirect(url_for('annotate_resume'))
+
+    skills = lines[b['skills_start']: b['skills_end'] + 1]
+    work   = lines[b['work_start']:   b['work_end']   + 1]
+
+    return render_template('annotate_confirm.html',
+                           skills=skills,
+                           work=work)
 
 def generate_cache_key(text, phrases):
     """Generate a unique cache key based on text and phrases."""
@@ -259,11 +330,14 @@ def compare_resume():
         temp_filename = temp_file.name
         resume_file.save(temp_filename)
         
-        # Process the resume
         matcher = ResumeJobMatcher()
         results = matcher.analyze_resume_for_job(temp_filename, original_text)
+        with pdfplumber.open(temp_filename) as pdf:
+            raw_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        key = str(uuid.uuid4())
+        _resume_store[key] = raw_text.split('\n')
+        session['resume_key'] = key
         
-        # Clean up temp file
         os.unlink(temp_filename)
         
         if not results:
