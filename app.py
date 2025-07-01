@@ -3,6 +3,7 @@ import uuid
 from extractor import extract_phrases
 from wordcloud import WordCloud
 from transformers import pipeline
+from flask_session import Session
 from collections import Counter
 import re
 import io
@@ -18,37 +19,60 @@ from news_fetcher import get_news_for_industry, get_available_industries
 import pdfplumber
 
 app = Flask(__name__)
+# tell Flask-Session to store session data in server-side files
 app.secret_key = 'your_secret_key_here' 
+app.config.update({
+    "SESSION_PERMANENT": False,      # Sessions aren’t permanent by default
+    "SESSION_TYPE": "filesystem",    # other options: "redis", "mongodb", etc.
+    "SESSION_FILE_DIR": "./.flask_session",  
+    "SESSION_FILE_THRESHOLD": 1000,  # how many files before cleanup kicks in
+})
+Session(app)
 summarizer = pipeline("text2text-generation", model="google/flan-t5-large")
 
 summary_cache = {}
 _resume_store = {}
 
-def get_jobs():
-    return session.setdefault('jobs', [])
+def get_job(job_id):
+    """Retrieve a specific job by its ID from the session."""
+    jobs = session.get('jobs', [])
+    for job in jobs:
+        if job.get('id') == job_id:
+            return job
+    return None
 
 @app.route('/')
-def root():
-    return redirect(url_for('jobs'))
+def landing():
+    if 'current_job_id' in session:
+        session.pop('current_job_id')
+    return render_template('index.html')
 
 @app.route('/jobs', methods=['GET', 'POST'])
 def jobs():
-    jobs = get_jobs()
+    session.pop('current_job_id', None)
+    jobs_list = session.setdefault('jobs', [])
     if request.method == 'POST':
-        new_text = request.form.get('job_text', '').strip()
-        if new_text:
-            jobs.append(new_text)
-            session['jobs'] = jobs
+        title = request.form.get('job_title', '').strip()
+        text = request.form.get('job_text', '').strip()
+        if title and text:
+            new_job = {
+                'id': str(uuid.uuid4()),
+                'title': title,
+                'text': text,
+                'phrases': [],
+                'highlighted_text': text,
+                'resume_analysis': None,
+                'resume_key': None
+            }
+            jobs_list.append(new_job)
+            session['jobs'] = jobs_list
         return redirect(url_for('jobs'))
+    return render_template('jobs.html', jobs=jobs_list)
 
-    return render_template('jobs.html', jobs=jobs)
-
-@app.route('/jobs/delete/<int:index>', methods=['POST'])
-def delete_job(index):
-    jobs = get_jobs()
-    if 0 <= index < len(jobs):
-        jobs.pop(index)
-        session['jobs'] = jobs
+@app.route('/jobs/delete/<job_id>', methods=['POST'])
+def delete_job(job_id):
+    jobs_list = session.get('jobs', [])
+    session['jobs'] = [job for job in jobs_list if job.get('id') != job_id]
     return redirect(url_for('jobs'))
 
 def escape_js_string(text):
@@ -57,51 +81,72 @@ def escape_js_string(text):
 app.jinja_env.filters['escapejs'] = escape_js_string
 
 
-@app.route('/annotate_resume', methods=['GET'])
-def annotate_resume():
+@app.route('/annotate_resume/<job_id>', methods=['GET'])
+def annotate_resume(job_id):
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
     raw = session.get('resume_text', '')
-    lines = _resume_store.get(session.get('resume_key'), [])
-    return render_template('annotate.html', lines=lines)
+    lines = _resume_store.get(job.get('resume_key'), [])
+    return render_template('annotate.html', job=job, lines=lines)
 
-@app.route('/annotate_resume', methods=['POST'])
-def annotate_resume_post():
+@app.route('/annotate_resume/<job_id>', methods=['POST'])
+def annotate_resume_post(job_id):
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
     bounds = {
-      'skills_start': int(request.form['skills_start']),
-      'skills_end':   int(request.form['skills_end']),
-      'work_start':   int(request.form['work_start']),
-      'work_end':     int(request.form['work_end']),
+        'skills_start': int(request.form['skills_start']),
+        'skills_end':   int(request.form['skills_end']),
+        'work_start':   int(request.form['work_start']),
+        'work_end':     int(request.form['work_end']),
     }
     session['section_bounds'] = bounds
-    return redirect(url_for('annotate_confirm'))
+    return redirect(url_for('annotate_confirm', job_id=job_id))
 
-@app.route('/generate_cv')
-def generate_cv():
-    # TODO: hook this up to your LaTeX-compile pipeline
-    return "PDF generation not yet implemented", 200
-
-@app.route('/annotate_confirm')
-def annotate_confirm():
-    key = session.get('resume_key')
-    if not key or key not in _resume_store:
+@app.route('/annotate_confirm/<job_id>')
+def annotate_confirm(job_id):
+    job = get_job(job_id)
+    if not job or job.get('resume_key') not in _resume_store:
         return "No resume loaded", 400
 
-    lines = _resume_store[key]
+    lines = _resume_store[job['resume_key']]
     b = session.get('section_bounds', {})
     if not all(k in b for k in ('skills_start','skills_end','work_start','work_end')):
-        return redirect(url_for('annotate_resume'))
+        return redirect(url_for('annotate_resume', job_id=job_id))
 
     skills = lines[b['skills_start']: b['skills_end'] + 1]
     work   = lines[b['work_start']:   b['work_end']   + 1]
 
-    return render_template('annotate_confirm.html',
-                           skills=skills,
-                           work=work)
+    return render_template(
+        'annotate_confirm.html',
+        job=job,
+        skills=skills,
+        work=work
+    )
 
 def generate_cache_key(text, phrases):
     """Generate a unique cache key based on text and phrases."""
     sorted_phrases = sorted(phrases)
     key_content = text + '|' + '|'.join(sorted_phrases)
     return hashlib.md5(key_content.encode()).hexdigest()
+
+@app.route('/upload_resume/<job_id>', methods=['GET'])
+def upload_resume(job_id):
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
+
+    session['current_job_id'] = job_id
+    if request.args.get('new'):
+        job['resume_analysis'] = None
+        job['resume_key']      = None
+        session.modified = True
+
+    if job.get('resume_analysis'):
+        return redirect(url_for('compare_resume', job_id=job_id))
+
+    return render_template('resume_upload.html', job=job)
 
 def highlight_phrases(text, phrases, selected_phrase=None):
     phrases = sorted(phrases, key=len, reverse=True)
@@ -219,46 +264,18 @@ def summarize_keywords_in_context(text, keywords, max_length=512, use_cache=True
         print(f"Error in summarize_keywords_in_context: {e}")
         return {keyword: f"Error: {str(e)}" for keyword in keywords}
 
-@app.route('/phrase_list', methods=['GET', 'POST'])
-def phrase_list():
-    print("Debug - Entering phrase_list route")  # Debug output
-    
-    if request.method == 'POST':
-        addressed_phrases = request.form.getlist('addressed_phrases')
-        addressed_phrases = set(addressed_phrases)
-        return render_template(
-            'list.html',
-            text=request.args.get('text', ''),
-            phrases=sorted(request.args.getlist('phrases')),
-            frequencies=json.loads(request.args.get('frequencies', '{}')),
-            addressed_phrases=addressed_phrases,
-            summaries=json.loads(request.args.get('summaries', '{}'))
-        )
+@app.route('/phrase_list/<job_id>')
+def phrase_list(job_id):
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
 
-    text = request.args.get('text', '')
-    phrases = request.args.getlist('phrases')
-    frequencies = Counter(phrases)
-
-    cache_key = generate_cache_key(text, phrases)
-    
-    try:
-        if cache_key in summary_cache:
-            print(f"Debug - Using cached summaries with key: {cache_key}")
-            summaries = summary_cache[cache_key]
-        else:
-            print(f"Debug - Generating new summaries for key: {cache_key}")
-            summaries = summarize_keywords_in_context(text, phrases)
-            summary_cache[cache_key] = summaries
-    except Exception as e:
-        print(f"Error in phrase_list: {e}")
-        summaries = {phrase: f"Error generating summary" for phrase in phrases}
+    frequencies = Counter(job.get('phrases', []))
     return render_template(
         'list.html',
-        text=text,
+        job=job,
         phrases=sorted(frequencies.keys(), key=lambda x: frequencies[x], reverse=True),
-        frequencies=frequencies,
-        addressed_phrases=set(),
-        summaries=summaries
+        frequencies=frequencies
     )
   
 @app.route('/')
@@ -274,83 +291,61 @@ def index():
                           selected_industry=selected_industry,
                           industries=industries)
 
-@app.route('/extract', methods=['POST'])
-def extract_keywords():
-    original_text = request.form.get('text', '')
-    
-    if not original_text.strip():
-        return redirect(request.url)
-    phrases = extract_phrases(original_text)
-    highlighted_text = highlight_phrases(original_text, phrases)
-    return render_template(
-        'results.html', 
-        highlighted_text=highlighted_text, 
-        phrases=phrases, 
-        original_text=original_text
-    )
 
-@app.route('/upload_resume', methods=['GET'])
-def upload_resume():
-    original_text = request.args.get('original_text', '')
-    phrases = request.args.getlist('phrases')
+@app.route('/extract/<job_id>', methods=['POST'])
+def extract_keywords(job_id):
+    """Extracts keywords for a specific job and redirects to the results."""
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
     
-    return render_template(
-        'resume_upload.html',
-        original_text=original_text,
-        phrases=phrases
-    )
+    phrases = extract_phrases(job['text'])
+    job['phrases'] = phrases
+    job['highlighted_text'] = highlight_phrases(job['text'], phrases)
+    
+    session['current_job_id'] = job_id
+    session.modified = True
+    
+    return redirect(url_for('highlight_phrase', job_id=job_id))
 
-@app.route('/compare_resume', methods=['POST'])
-def compare_resume():
-    try:
-        original_text = request.form.get('original_text', '')
-        phrases_json = request.form.get('phrases', '[]')
-        
-        # Handle both string and list formats
-        if isinstance(phrases_json, str):
-            try:
-                phrases = json.loads(phrases_json)
-            except json.JSONDecodeError:
-                phrases = []
-        else:
-            phrases = phrases_json
-            
-        # Check if file was uploaded
-        if 'resume' not in request.files:
-            return redirect(url_for('extract_keywords'))
-            
+@app.route('/compare_resume/<job_id>', methods=['GET', 'POST'])
+def compare_resume(job_id):
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
+
+    session['current_job_id'] = job_id
+
+    if request.method == 'POST':
+        if 'resume' not in request.files or request.files['resume'].filename == '':
+            return "No resume file provided.", 400
+
         resume_file = request.files['resume']
         
-        # If no file selected
-        if resume_file.filename == '':
-            return redirect(url_for('extract_keywords'))
-            
-        # Create temp file for the PDF
-        temp_file = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
-        temp_filename = temp_file.name
-        resume_file.save(temp_filename)
-        
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
+            temp_filename = temp_file.name
+            resume_file.save(temp_filename)
+
         matcher = ResumeJobMatcher()
-        results = matcher.analyze_resume_for_job(temp_filename, original_text)
+        results = matcher.analyze_resume_for_job(temp_filename, job['text'])
+        job['resume_analysis'] = results
+        
         with pdfplumber.open(temp_filename) as pdf:
             raw_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-        key = str(uuid.uuid4())
-        _resume_store[key] = raw_text.split('\n')
-        session['resume_key'] = key
+        
+        resume_key = str(uuid.uuid4())
+        _resume_store[resume_key] = raw_text.split('\n')
+        job['resume_key'] = resume_key
         
         os.unlink(temp_filename)
+        session.modified = True
         
-        if not results:
-            return "Error processing resume", 500
-            
-        return render_template(
-            'resume_compare.html',
-            results=results
-        )
-        
-    except Exception as e:
-        print(f"Error in compare_resume: {str(e)}")
-        return f"An error occurred: {str(e)}", 500
+        return redirect(url_for('compare_resume', job_id=job_id))
+
+    if not job.get('resume_analysis'):
+        return redirect(url_for('upload_resume', job_id=job_id))
+
+    return render_template('resume_compare.html', job=job, results=job['resume_analysis'])
 
 @app.route('/visualization')
 def visualize_phrases():
@@ -359,53 +354,51 @@ def visualize_phrases():
     frequencies = Counter(phrases)
     return render_template('cloud.html', phrases=phrases, text=text, frequencies=frequencies)
 
-@app.route('/highlight_phrase')
-def highlight_phrase():
-    original_text = request.args.get('original_text', '')
-    phrases = request.args.get('phrases', '[]')
-    try:
-        phrases = json.loads(phrases) if isinstance(phrases, str) else phrases
-    except json.JSONDecodeError:
-        phrases = []
-    selected_phrase = request.args.get('phrase')
-    highlighted_text = highlight_phrases(original_text, phrases, selected_phrase)
-    return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases, original_text=original_text)
+def get_current():
+    data = session.get('last_extraction')
+    if not data:
+        return redirect(url_for('index'))
+    return data
 
-@app.route('/edit_phrases', methods=['GET', 'POST'])
-def edit_phrases():
-    if request.method == 'POST':
-        original_text = request.form.get('original_text', '')
-        phrases = request.form.get('phrases', '[]')
-        phrases = eval(phrases)
-        highlighted_text = highlight_phrases(original_text, phrases)
-        return render_template('results.html', highlighted_text=highlighted_text, phrases=phrases, original_text=original_text)
+@app.route('/highlight_phrase/<job_id>')
+def highlight_phrase(job_id):
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
     
-    original_text = request.args.get('original_text', '')
-    phrases = request.args.getlist('phrases')
-    word_positions = get_word_positions(original_text)
-    words_info = []
-    for pos, word in word_positions.items():
-        word_info = {
-            'word': word,
-            'position': pos,
-            'in_phrase': False,
-            'phrase': None
-        }
-        for phrase in phrases:
-            if ' ' in phrase:  
-                if word in phrase.split():
-                    word_info['in_phrase'] = True
-                    word_info['phrase'] = phrase
-            elif phrase == word:  
-                word_info['in_phrase'] = True
-                word_info['phrase'] = phrase
-                
-        words_info.append(word_info)
+    session['current_job_id'] = job_id
+    return render_template('results.html', job=job)
 
-    return render_template('editor.html', 
-                         original_text=original_text, 
-                         phrases=phrases,
-                         words_info=words_info)
+
+@app.route('/edit_phrases/<job_id>', methods=['GET', 'POST'])
+def edit_phrases(job_id):
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
+
+    if request.method == 'POST':
+        updated_phrases = json.loads(request.form.get('phrases', '[]'))
+        job['phrases'] = updated_phrases
+        job['highlighted_text'] = highlight_phrases(job['text'], updated_phrases)
+        session.modified = True
+        return redirect(url_for('highlight_phrase', job_id=job_id))
+    original_text = job['text']
+    phrases       = job.get('phrases', [])
+    words_info    = []
+    for i, word in enumerate(original_text.split()):
+        words_info.append({
+            'word': word,
+            'in_phrase': any(word in p.split() for p in phrases),
+            'phrase': next((p for p in phrases if word in p.split()), None)
+        })
+
+    return render_template(
+        'editor.html',
+        job=job,
+        original_text=original_text,
+        phrases=phrases,
+        words_info=words_info
+    )
 
 @app.route('/summarize_keywords', methods=['POST'])
 def summarize_keywords():

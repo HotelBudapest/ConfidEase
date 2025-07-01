@@ -15,7 +15,9 @@
     {% endfor %}
   </div>
 
-  <form method="POST" action="{{ url_for('annotate_resume') }}" class="space-y-4">
+    <form method="POST"
+          action="{{ url_for('annotate_resume', job_id=job.id) }}"
+          class="space-y-4">
     <input type="hidden" name="skills_start" id="skills_start">
     <input type="hidden" name="skills_end"   id="skills_end">
     <input type="hidden" name="work_start"   id="work_start">
@@ -28,6 +30,10 @@
             disabled>
       Confirm Selections
     </button>
+    <a href="{{ url_for('compare_resume', job_id=job.id) }}"
+       class="inline-block mt-2 text-sm text-gray-600 dark:text-gray-400 hover:underline">
+      Cancel
+    </a>
   </form>
 </div>
 
