@@ -4,94 +4,166 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Keyword Extractor</title>
-    <!-- Pixelated font for "ConfidEASE" -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
-      rel="stylesheet"
-    />
-    <!-- Tailwind CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+    <style>
+      /* Custom Tabs Styles */
+      .custom-tabs-container{
+        position:relative;
+        background:#fff;
+        border-bottom:2px solid #e5e7eb;
+        margin-bottom:0;
+      }
+      .dark .custom-tabs-container{
+        background:#000;
+        border-bottom-color:#374151;
+      }
+      .custom-tabs{
+        display:flex;
+        justify-content:center;
+        align-items:flex-end;
+        gap:0;
+        padding:0 1rem;
+        margin:0;
+        list-style:none;
+        overflow-x:auto;
+      }
+      .custom-tab{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        padding:.75rem 1.5rem;
+        text-decoration:none;
+        color:#6b7280;
+        background:transparent;
+        border:2px solid transparent;
+        border-bottom:none;
+        border-radius:.5rem .5rem 0 0;
+        position:relative;
+        font-weight:500;
+        font-size:.875rem;
+        white-space:nowrap;
+        transition:all .2s ease;
+        z-index:1;
+        margin-bottom:-2px;
+      }
+      .custom-tab:hover{
+        color:#374151;
+        background:#f9fafb;
+        border-color:#e5e7eb;
+      }
+      .custom-tab.active{
+        color:#111827;
+        background:#fff;
+        border-color:#e5e7eb;
+        border-bottom:2px solid #fff;
+        z-index:2;
+        font-weight:600;
+      }
+      .dark .custom-tab{
+        color:#9ca3af;
+      }
+      .dark .custom-tab:hover{
+        color:#d1d5db;
+        background:#1f2937;
+        border-color:#374151;
+      }
+      .dark .custom-tab.active{
+        color:#f9fafb;
+        background:#000;
+        border-color:#374151;
+        border-bottom:2px solid #000;
+      }
+      .custom-tab.active::before{
+        content:'';
+        position:absolute;
+        top:0; left:0; right:0; bottom:-1px;
+        background:inherit;
+        border-radius:inherit;
+        box-shadow:0 -2px 4px rgba(0,0,0,.1);
+        z-index:-1;
+      }
+      .dark .custom-tab.active::before{
+        box-shadow:0 -2px 4px rgba(0,0,0,.3);
+      }
+      @media (max-width:640px){
+        .custom-tabs{padding:0 .5rem;}
+        .custom-tab{padding:.5rem 1rem;font-size:.8rem;}
+      }
+    </style>
   </head>
 
-  <!-- body starts in light mode: .bg-white .text-black, toggled by .dark -->
-  <body class="bg-white text-black transition-colors duration-300">
-    
-    <!-- Sticky header with brand + dark mode switch -->
-    <header class="sticky top-0 z-40 w-full border-b border-black bg-white
-                   dark:bg-black dark:border-white transition-colors duration-300">
+  <body class="bg-white text-black dark:bg-black dark:text-white transition-colors duration-300">
+    <header class="sticky top-0 z-40 w-full border-b border-black bg-white dark:bg-black dark:border-white transition-colors duration-300">
       <div class="flex h-16 items-center px-4 justify-between">
-        
-        <!-- Left side brand -->
         <div class="flex items-center space-x-2">
-          <span class="font-bold text-lg">
-            <!-- “ConfidEASE” with pixel font on “EASE” -->
-            <span class="pixel-font bg-white text-black dark:bg-black dark:text-white">
-              Confid<span class="bg-black text-white dark:bg-white dark:text-black">EASE</span>
+          <a href="{{ url_for('index') }}" class="font-bold text-lg text-black dark:text-white">
+            <span class="pixel-font">
+              Confid<span class="bg-black dark:bg-white text-white dark:text-black">EASE</span>
             </span>
-          </span>
+          </a>
         </div>
 
-        <!-- somewhere in your header nav -->
-        <a href="{{ url_for('jobs') }}"
-           class="px-4 py-2 text-sm hover:underline">
+        <a href="{{ url_for('jobs') }}" class="px-4 py-2 text-sm text-black dark:text-white hover:underline">
           Jobs Dashboard
         </a>
-        <!-- Right side: Dark Mode Toggle (simple custom switch) -->
+
         <div class="flex items-center space-x-2">
-          <label for="darkModeSwitch" class="text-sm font-medium dark:text-white">
-            Dark Mode
+          <label for="darkModeSwitch" class="flex items-center cursor-pointer">
+            <div class="relative">
+              <input id="darkModeSwitch" type="checkbox" class="sr-only peer" onchange="toggleDarkMode()" />
+              <!-- track -->
+              <div class="w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black dark:peer-focus:ring-white peer-checked:bg-black dark:peer-checked:bg-white transition-colors duration-300"></div>
+              <!-- thumb -->
+              <div class="absolute left-1 top-1 w-4 h-4 bg-white dark:bg-black border border-black dark:border-white rounded-full transition-transform duration-300 peer-checked:translate-x-5"></div>
+            </div>
+            <span class="ml-3 text-sm font-medium text-black dark:text-white">Dark Mode</span>
           </label>
-          <div class="relative inline-flex items-center">
-            <!-- Actual checkbox input (hidden) -->
-            <input
-              id="darkModeSwitch"
-              type="checkbox"
-              class="sr-only peer"
-              onclick="toggleDarkMode()"
-            />
-            <!-- Background track -->
-            <div
-              class="w-11 h-6 bg-gray-300 peer-focus:outline-none
-                     peer-focus:ring-2 peer-focus:ring-black dark:peer-focus:ring-white
-                     rounded-full peer dark:bg-gray-600
-                     peer-checked:bg-black dark:peer-checked:bg-white
-                     transition-colors duration-300 ease-in-out"
-            ></div>
-            <!-- Thumb (the circle that slides) -->
-            <div
-              class="absolute left-0.5 top-0.5 w-5 h-5 bg-white dark:bg-black 
-                     border border-black dark:border-white 
-                     rounded-full transition-all duration-300 ease-in-out
-                     peer-checked:translate-x-5"
-            ></div>
-          </div>
         </div>
       </div>
     </header>
 
-    <!-- Main content from child templates -->
-    {% block content %}{% endblock %}
+    {% if 'current_job_id' in session and session.current_job_id %}
+      {% set job_id = session.current_job_id %}
+      <div class="custom-tabs-container">
+        <div class="custom-tabs">
+          <a href="{{ url_for('highlight_phrase', job_id=job_id) }}" class="custom-tab {% if request.endpoint in ['highlight_phrase', 'edit_phrases', 'phrase_list'] %}active{% endif %}">Picked Keywords</a>
+          <a href="{{ url_for('upload_resume', job_id=job_id) }}" class="custom-tab {% if request.endpoint in ['upload_resume', 'compare_resume'] %}active{% endif %}">Resume Tailoring</a>
+        </div>
+      </div>
+    {% endif %}
+
+    <main class="bg-white dark:bg-black">
+      {% block content %}{% endblock %}
+    </main>
 
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
 
-    <!-- Script that toggles dark mode AND persists it -->
     <script>
-      // Toggle the .dark class, then store the current mode
-      function toggleDarkMode() {
-        document.body.classList.toggle("dark")
-        // If dark is active, store 'true', else 'false'
-        localStorage.setItem("darkMode", document.body.classList.contains("dark"))
+      const themeKey = 'themePreference';
+      const htmlEl   = document.documentElement;
+      const toggle   = document.getElementById('darkModeSwitch');
+
+      function applyTheme(theme) {
+        if (theme === 'dark') {
+          htmlEl.classList.add('dark');
+        } else {
+          htmlEl.classList.remove('dark');
+        }
+        localStorage.setItem(themeKey, theme);
+        if (toggle) toggle.checked = (theme === 'dark');
       }
 
-      // On page load, read localStorage to see if user last had dark mode on
-      window.addEventListener("DOMContentLoaded", () => {
-        const savedMode = localStorage.getItem("darkMode")
-        if (savedMode === "true") {
-          document.body.classList.add("dark")
-          document.getElementById("darkModeSwitch").checked = true
-        }
-      })
+      function toggleDarkMode() {
+        const next = htmlEl.classList.contains('dark') ? 'light' : 'dark';
+        applyTheme(next);
+      }
+
+      window.addEventListener('DOMContentLoaded', () => {
+        const saved = localStorage.getItem(themeKey) || 'light';
+        applyTheme(saved);
+      });
     </script>
   </body>
 </html>

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex items-center justify-center h-[calc(100vh-4rem)] bg-base-100 text-base-content">
+  <div class="text-center space-y-6">
+    <!-- Big logo -->
+    <span class="pixel-font text-5xl text-black dark:text-white">
+      Confid<span class="bg-black dark:bg-white text-white dark:text-black px-2">EASE</span>
+    </span>
+
+    <!-- Get Started button -->
+    <a href="{{ url_for('jobs') }}"
+       class="btn btn-primary btn-lg transition-transform hover:-translate-y-1">
+      Get Started
+    </a>
+  </div>
+</div>
+{% endblock %}

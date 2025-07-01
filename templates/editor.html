@@ -11,7 +11,7 @@
 
   <!-- Main Content -->
   <div class="p-6">
-    <form id="phrase-editor-form" method="POST" action="{{ url_for('edit_phrases') }}">
+    <form id="phrase-editor-form" method="POST" action="{{ url_for('edit_phrases', job_id=job.id) }}">
       <input type="hidden" name="original_text" value="{{ original_text|escape }}">
       <input type="hidden" id="updated-phrases" name="phrases" value="{{ phrases|tojson }}">
       
@@ -58,7 +58,7 @@
           </span>
         </button>
         
-        <a href="{{ url_for('highlight_phrase', original_text=original_text|escape, phrases=phrases|tojson) }}"
+        <a href="{{ url_for('highlight_phrase', job_id=job.id) }}?original_text={{ original_text|urlencode }}&phrases={{ phrases|tojson|urlencode }}"
            class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md bg-white dark:bg-black transition-colors duration-300">
           <span class="absolute inset-0 -translate-x-full 
                        bg-black dark:bg-white 

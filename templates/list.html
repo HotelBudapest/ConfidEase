@@ -11,7 +11,7 @@
 
   <!-- Main Content -->
   <div class="p-6">
-    <form id="phrase-list-form" method="POST" action="{{ url_for('phrase_list') }}">
+    <form id="phrase-list-form" method="POST" action="{{ url_for('phrase_list', job_id = job.id) }}">
       <input type="hidden" name="text" value="{{ text|escape }}">
       <input type="hidden" name="cache_key" value="{{ cache_key }}">
       
@@ -81,7 +81,7 @@
       
       <!-- Action Buttons -->
       <div class="flex justify-center gap-4 mt-6">
-        <a href="{{ url_for('highlight_phrase', original_text=text|escape, phrases=phrases|tojson) }}"
+        <a href="{{ url_for('highlight_phrase', job_id=job.id) }}?original_text={{ text|urlencode }}&phrases={{ phrases|tojson|urlencode }}"
            class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md bg-white dark:bg-black transition-colors duration-300">
           <span class="absolute inset-0 -translate-x-full 
                        bg-black dark:bg-white 
@@ -92,7 +92,7 @@
             Go Back
           </span>
         </a>
-        <a href="{{ url_for('edit_phrases', original_text=text|escape, phrases=phrases) }}"
+        <a href="{{ url_for('edit_phrases', job_id=job.id) }}?original_text={{ text|urlencode }}&phrases={{ phrases|tojson|urlencode }}"
            class="relative group overflow-hidden px-6 py-3 border border-black dark:border-white rounded-md bg-white dark:bg-black transition-colors duration-300">
           <span class="absolute inset-0 -translate-x-full 
                        bg-black dark:bg-white 
