@@ -90,6 +90,39 @@
         .custom-tabs{padding:0 .5rem;}
         .custom-tab{padding:.5rem 1rem;font-size:.8rem;}
       }
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 20px;
+      }
+      .toggle-switch input {
+        opacity: 0;
+        width: 0; height: 0;
+      }
+      .toggle-switch .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #ccc;
+        transition: .2s;
+        border-radius: 20px;
+      }
+      .toggle-switch .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px; width: 16px;
+        left: 2px; bottom: 2px;
+        background-color: white;
+        transition: .2s;
+        border-radius: 50%;
+      }
+      .toggle-switch input:checked + .slider {
+        background-color: #000;
+      }
+      .toggle-switch input:checked + .slider:before {
+        transform: translateX(20px);
+      }
     </style>
   </head>
 
@@ -109,18 +142,16 @@
         </a>
 
         <div class="flex items-center space-x-2">
-          <label for="darkModeSwitch" class="flex items-center cursor-pointer">
-            <div class="relative">
-              <input id="darkModeSwitch" type="checkbox" class="sr-only peer" onchange="toggleDarkMode()" />
-              <!-- track -->
-              <div class="w-11 h-6 bg-gray-300 dark:bg-gray-600 rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black dark:peer-focus:ring-white peer-checked:bg-black dark:peer-checked:bg-white transition-colors duration-300"></div>
-              <!-- thumb -->
-              <div class="absolute left-1 top-1 w-4 h-4 bg-white dark:bg-black border border-black dark:border-white rounded-full transition-transform duration-300 peer-checked:translate-x-5"></div>
-            </div>
-            <span class="ml-3 text-sm font-medium text-black dark:text-white">Dark Mode</span>
+          <!-- switch -->
+          <label class="toggle-switch">
+            <input id="darkModeSwitch" type="checkbox" onchange="toggleDarkMode()">
+            <span class="slider"></span>
           </label>
+          <!-- label -->
+          <span class="text-sm font-medium text-black dark:text-white">
+            Dark Mode
+          </span>
         </div>
-      </div>
     </header>
 
     {% if 'current_job_id' in session and session.current_job_id %}

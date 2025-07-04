@@ -264,18 +264,27 @@ def summarize_keywords_in_context(text, keywords, max_length=512, use_cache=True
         print(f"Error in summarize_keywords_in_context: {e}")
         return {keyword: f"Error: {str(e)}" for keyword in keywords}
 
+
 @app.route('/phrase_list/<job_id>')
 def phrase_list(job_id):
     job = get_job(job_id)
     if not job:
         return "Job not found", 404
-
-    frequencies = Counter(job.get('phrases', []))
+    text    = job['text']
+    phrases = job.get('phrases', [])
+    frequencies = Counter(phrases)
+    cache_key   = generate_cache_key(text, phrases)
+    summaries = summarize_keywords_in_context(text, phrases)
+    addressed_phrases = session.get('addressed_phrases', [])
     return render_template(
         'list.html',
         job=job,
-        phrases=sorted(frequencies.keys(), key=lambda x: frequencies[x], reverse=True),
-        frequencies=frequencies
+        text=text,
+        phrases=phrases,
+        frequencies=frequencies,
+        cache_key=cache_key,
+        summaries=summaries,
+        addressed_phrases=addressed_phrases
     )
   
 @app.route('/')
