@@ -19,6 +19,20 @@
                   placeholder="Paste the full description…"
                   class="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-indigo-300 dark:focus:ring-indigo-600 resize-none"></textarea>
       </div>
+      <div class="mb-4">
+        <label for="industry" class="block text-sm font-medium mb-1">Market</label>
+        <select id="industry" name="industry" required
+                class="w-full …">
+          {% for ind in industries %}
+            <option value="{{ ind }}">{{ ind.capitalize() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-4">
+        <label for="company" class="block text-sm font-medium mb-1">Company (optional)</label>
+        <input id="company" name="company" type="text" placeholder="e.g. Google"
+               class="w-full …" />
+      </div>
       <button type="submit"
               class="w-full bg-black dark:bg-white text-white dark:text-black font-medium py-2 rounded hover:bg-black/90 dark:hover:bg-white/90 transition">
         Add Job

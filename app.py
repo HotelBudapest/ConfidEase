@@ -3,6 +3,17 @@ import uuid
 from extractor import extract_phrases
 from wordcloud import WordCloud
 from transformers import pipeline
+from threading import Thread
+import time, datetime, urllib.parse, feedparser
+from news_fetcher import (
+    get_news_for_industry,
+    get_available_industries,
+    get_cached_news,
+    extract_image,
+    clean_html,
+    get_entry_date,
+    CACHE_DURATION,
+)
 from flask_session import Session
 from collections import Counter
 import re
@@ -15,7 +26,6 @@ import hashlib
 import os
 import tempfile
 from resume_matcher import ResumeJobMatcher
-from news_fetcher import get_news_for_industry, get_available_industries
 import pdfplumber
 
 app = Flask(__name__)
@@ -32,6 +42,7 @@ summarizer = pipeline("text2text-generation", model="google/flan-t5-large")
 
 summary_cache = {}
 _resume_store = {}
+COMPANY_NEWS_CACHE = {}
 
 def get_job(job_id):
     """Retrieve a specific job by its ID from the session."""
@@ -47,13 +58,75 @@ def landing():
         session.pop('current_job_id')
     return render_template('index.html')
 
+
+from threading import Thread
+from flask import request, session, render_template
+
+@app.route('/news/<job_id>')
+def news(job_id):
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
+
+    session['current_job_id'] = job_id
+    source = request.args.get('source', 'market')
+    news_items = []
+    loading    = False
+
+    if source == 'company' and job.get('company'):
+        # COMPANY NEWS
+        company = job['company']
+        cached  = get_cached_company_news(company)
+        if cached is None:
+            session['news_loading'] = True
+            def bg_fetch_co():
+                items = fetch_company_news(company)
+                cache_company_news(company, items)
+            Thread(target=bg_fetch_co, daemon=True).start()
+            loading = True
+        else:
+            session.pop('news_loading', None)
+            news_items = cached
+
+        industries = None
+
+    else:
+        industry = job.get('industry', 'technology')
+        cached   = get_cached_news(industry)
+        if cached is None:
+            session['news_loading'] = True
+            def bg_fetch_mkt():
+                get_news_for_industry(industry)
+            Thread(target=bg_fetch_mkt, daemon=True).start()
+            loading = True
+        else:
+            session.pop('news_loading', None)
+            news_items = cached
+
+        industries = get_available_industries()
+
+    return render_template(
+      'news.html',
+      job=job,
+      source=source,
+      industry=job.get('industry','technology'),
+      industries=industries,
+      news_items=news_items,
+      loading=session.get('news_loading', False)
+    )
+
 @app.route('/jobs', methods=['GET', 'POST'])
 def jobs():
+    # clear any existing job context
     session.pop('current_job_id', None)
+
     jobs_list = session.setdefault('jobs', [])
     if request.method == 'POST':
-        title = request.form.get('job_title', '').strip()
-        text = request.form.get('job_text', '').strip()
+        title    = request.form.get('job_title', '').strip()
+        text     = request.form.get('job_text', '').strip()
+        industry = request.form.get('industry')
+        company  = request.form.get('company', '').strip() or None
+
         if title and text:
             new_job = {
                 'id': str(uuid.uuid4()),
@@ -62,12 +135,59 @@ def jobs():
                 'phrases': [],
                 'highlighted_text': text,
                 'resume_analysis': None,
-                'resume_key': None
+                'resume_key': None,
+                'industry': industry,
+                'company': company
             }
             jobs_list.append(new_job)
             session['jobs'] = jobs_list
+
         return redirect(url_for('jobs'))
-    return render_template('jobs.html', jobs=jobs_list)
+
+    # on GET, pass the list of possible industries into the template
+    return render_template(
+        'jobs.html',
+        jobs=jobs_list,
+        industries=get_available_industries()
+    )
+
+def get_cached_company_news(company):
+    entry = COMPANY_NEWS_CACHE.get(company.lower())
+    if not entry: 
+        return None
+    timestamp, items = entry
+    if time.time() - timestamp < CACHE_DURATION:
+        return items
+    return None
+
+def cache_company_news(company, items):
+    COMPANY_NEWS_CACHE[company.lower()] = (time.time(), items)
+
+def fetch_company_news(company):
+    """Grab top ~15 items from Google News RSS for the company."""
+    q   = urllib.parse.quote(company)
+    url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
+    feed = feedparser.parse(url)
+    out = []
+    for entry in feed.entries[:15]:
+        img     = extract_image(entry)
+        title   = clean_html(entry.get('title','No Title'))
+        link    = entry.get('link','#')
+        pub     = get_entry_date(entry)
+        # pick earliest content field we can
+        summary = ""
+        for fld in ("summary","description","content"):
+            if hasattr(entry,fld) and getattr(entry,fld):
+                v = getattr(entry,fld)
+                if isinstance(v, list): v = v[0].get('value','')
+                summary = clean_html(v); break
+        summary = summary[:200] + ("…" if len(summary)>200 else "")
+        out.append({
+          "title": title, "link": link,
+          "published": pub, "summary": summary,
+          "image": img, "source": company
+        })
+    return out
 
 @app.route('/jobs/delete/<job_id>', methods=['POST'])
 def delete_job(job_id):

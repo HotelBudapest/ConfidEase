@@ -154,12 +154,22 @@
         </div>
     </header>
 
-    {% if 'current_job_id' in session and session.current_job_id %}
+    {% if session.get('current_job_id') %}
       {% set job_id = session.current_job_id %}
       <div class="custom-tabs-container">
         <div class="custom-tabs">
-          <a href="{{ url_for('highlight_phrase', job_id=job_id) }}" class="custom-tab {% if request.endpoint in ['highlight_phrase', 'edit_phrases', 'phrase_list'] %}active{% endif %}">Picked Keywords</a>
-          <a href="{{ url_for('upload_resume', job_id=job_id) }}" class="custom-tab {% if request.endpoint in ['upload_resume', 'compare_resume'] %}active{% endif %}">Resume Tailoring</a>
+          <a href="{{ url_for('highlight_phrase', job_id=job_id) }}"
+             class="custom-tab {% if request.endpoint=='highlight_phrase' %}active{% endif %}">
+            Picked Keywords
+          </a>
+          <a href="{{ url_for('upload_resume', job_id=job_id) }}"
+             class="custom-tab {% if request.endpoint=='upload_resume' or request.endpoint=='compare_resume' %}active{% endif %}">
+            Resume Tailoring
+          </a>
+          <a href="{{ url_for('news', job_id=job_id) }}"
+             class="custom-tab {% if request.endpoint=='news' %}active{% endif %}">
+            News
+          </a>
         </div>
       </div>
     {% endif %}

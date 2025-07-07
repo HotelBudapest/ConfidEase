@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6">
+
+  <!-- Source selector -->
+  <form id="news-form" method="GET" class="flex items-center gap-6 mb-6">
+    <!-- when market mode, show industry dropdown -->
+    {% if industries %}
+      <select name="industry"
+              onchange="document.getElementById('news-form').submit()"
+              class="px-3 py-2 border rounded">
+        {% for ind in industries %}
+          <option value="{{ ind }}" {% if ind==industry %}selected{% endif %}>
+            {{ ind.capitalize() }}
+          </option>
+        {% endfor %}
+      </select>
+    {% endif %}
+
+    <label class="inline-flex items-center cursor-pointer">
+      <input type="radio" name="source" value="market"
+             onchange="document.getElementById('news-form').submit()"
+             {% if source=='market' %}checked{% endif %}/>
+      <span class="ml-1">Market News</span>
+    </label>
+
+    {% if job.company %}
+    <label class="inline-flex items-center cursor-pointer">
+      <input type="radio" name="source" value="company"
+             onchange="document.getElementById('news-form').submit()"
+             {% if source=='company' %}checked{% endif %}/>
+      <span class="ml-1">Company News</span>
+    </label>
+    {% endif %}
+  </form>
+
+  {% if loading %}
+    <!-- spinner -->
+    <div class="flex justify-center py-20">
+      <svg class="animate-spin h-12 w-12 text-gray-500" …>…</svg>
+    </div>
+  {% else %}
+    {% if news_items %}
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for item in news_items %}
+        <div class="border rounded-lg overflow-hidden dark:bg-gray-800">
+          {% if item.image %}<img src="{{ item.image }}" class="w-full h-32 object-cover"/>{% endif %}
+          <div class="p-4">
+            <a href="{{ item.link }}" target="_blank"
+               class="text-lg font-semibold text-black dark:text-white hover:underline">
+              {{ item.title }}
+            </a>
+            <p class="text-sm text-gray-600 dark:text-gray-400">{{ item.published }}</p>
+            <p class="mt-2 text-sm text-gray-800 dark:text-gray-200">{{ item.summary }}</p>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-500">Source: {{ item.source }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-center py-20 text-gray-500">
+        No {{ source }} news yet—please wait a moment and reload.
+      </p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
