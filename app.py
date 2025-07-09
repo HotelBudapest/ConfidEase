@@ -14,9 +14,9 @@ from news_fetcher import (
     get_entry_date,
     CACHE_DURATION,
 )
+from linkedin_search import fetch_company_people
 from flask_session import Session
 from collections import Counter
-import re
 import io
 import html
 import json
@@ -27,6 +27,8 @@ import os
 import tempfile
 from resume_matcher import ResumeJobMatcher
 import pdfplumber
+import re
+from markupsafe import Markup
 
 app = Flask(__name__)
 # tell Flask-Session to store session data in server-side files
@@ -43,6 +45,19 @@ summarizer = pipeline("text2text-generation", model="google/flan-t5-large")
 summary_cache = {}
 _resume_store = {}
 COMPANY_NEWS_CACHE = {}
+PEOPLE_CACHE = {}
+
+
+@app.template_filter('highlight')
+def highlight_filter(text, term):
+    """
+    Wrap every occurrence of `term` in <span class="highlight">…</span>,
+    case-insensitive. Returns a Markup so it's not auto-escaped.
+    """
+    if not term or not text:
+        return text
+    pattern = re.compile(r'(' + re.escape(term) + r')', re.IGNORECASE)
+    return Markup(pattern.sub(r'<span class="highlight">\1</span>', text))
 
 def get_job(job_id):
     """Retrieve a specific job by its ID from the session."""
@@ -61,6 +76,42 @@ def landing():
 
 from threading import Thread
 from flask import request, session, render_template
+
+def get_cached_people(company: str):
+    """Return cached LinkedIn profiles for this company if still fresh."""
+    entry = PEOPLE_CACHE.get(company.lower())
+    if not entry:
+        return None
+    ts, profiles = entry
+    if time.time() - ts < CACHE_DURATION:
+        return profiles
+    return None
+
+def cache_people(company: str, profiles):
+    """Cache the LinkedIn profiles under this company key."""
+    PEOPLE_CACHE[company.lower()] = (time.time(), profiles)
+
+@app.route('/people/<job_id>')
+def people(job_id):
+    job = get_job(job_id)
+    if not job or not job.get("company"):
+        return "No company specified for this job.", 400
+
+    session['current_job_id'] = job_id
+    company = job["company"]
+
+    profiles = get_cached_people(company)
+    if profiles is None:
+        try:
+            profiles = fetch_company_people(company, size=10)
+            cache_people(company, profiles)
+        except Exception as e:
+            app.logger.error(f"LinkedIn search error: {e}")
+            profiles = []
+
+    return render_template("people.html",
+                           company=company,
+                           profiles=profiles)
 
 @app.route('/news/<job_id>')
 def news(job_id):

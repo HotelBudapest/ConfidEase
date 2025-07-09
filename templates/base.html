@@ -170,6 +170,10 @@
              class="custom-tab {% if request.endpoint=='news' %}active{% endif %}">
             News
           </a>
+          <a href="{{ url_for('people', job_id=job_id) }}"
+             class="custom-tab {% if request.endpoint=='people' %}active{% endif %}">
+            People
+          </a>
         </div>
       </div>
     {% endif %}
