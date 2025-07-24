@@ -7,115 +7,142 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
     <style>
-      /* Custom Tabs Styles */
-      .custom-tabs-container{
-        position:relative;
-        background:#fff;
-        border-bottom:2px solid #e5e7eb;
-        margin-bottom:0;
+      /* 1. Master background on the body */
+        body {
+          position: relative;
+          z-index: 0; /* so that ::before sits behind all content */
+        }
+
+        /* create a full-screen “background” layer */
+        body::before {
+          content: '';
+          position: fixed;
+          inset: 0;              /* top/right/bottom/left = 0 */
+          background: url('/static/assets/bg-light.jpg') center/cover no-repeat;
+          opacity: 0.3;          /* <-- your desired translucency */
+          z-index: -1;           /* push it behind everything */
+        }
+
+        /* swap to dark background when in .dark mode */
+        .dark body::before {
+          background-image: url('/static/assets/bg-dark.jpg');
+        }
+
+      /* 2. Make <main> transparent so we see body behind */
+      main {
+        background: transparent;
       }
-      .dark .custom-tabs-container{
-        background:#000;
-        border-bottom-color:#374151;
+
+        .floating-tile {
+          background-color: rgba(255,255,255,0.85);  /* 85% white */
+          backdrop-filter: blur(8px);
+        }
+        .dark .floating-tile {
+          background-color: rgba(0,0,0,0.85);        /* 85% black */
+        }
+
+      /* -- existing tab + toggle styles below -- */
+      .custom-tabs-container {
+        position: relative;
+        background: #fff;
+        border-bottom: 2px solid #e5e7eb;
+        margin-bottom: 0;
       }
-      .custom-tabs{
-        display:flex;
-        justify-content:center;
-        align-items:flex-end;
-        gap:0;
-        padding:0 1rem;
-        margin:0;
-        list-style:none;
-        overflow-x:auto;
+      .dark .custom-tabs-container {
+        background: #000;
+        border-bottom-color: #374151;
       }
-      .custom-tab{
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        padding:.75rem 1.5rem;
-        text-decoration:none;
-        color:#6b7280;
-        background:transparent;
-        border:2px solid transparent;
-        border-bottom:none;
-        border-radius:.5rem .5rem 0 0;
-        position:relative;
-        font-weight:500;
-        font-size:.875rem;
-        white-space:nowrap;
-        transition:all .2s ease;
-        z-index:1;
-        margin-bottom:-2px;
+      .custom-tabs {
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        gap: 0;
+        padding: 0 1rem;
+        margin: 0;
+        list-style: none;
+        overflow-x: auto;
       }
-      .custom-tab:hover{
-        color:#374151;
-        background:#f9fafb;
-        border-color:#e5e7eb;
+      .custom-tab {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: .75rem 1.5rem;
+        text-decoration: none;
+        color: #6b7280;
+        background: transparent;
+        border: 2px solid transparent;
+        border-bottom: none;
+        border-radius: .5rem .5rem 0 0;
+        position: relative;
+        font-weight: 500;
+        font-size: .875rem;
+        white-space: nowrap;
+        transition: all .2s ease;
+        z-index: 1;
+        margin-bottom: -2px;
       }
-      .custom-tab.active{
-        color:#111827;
-        background:#fff;
-        border-color:#e5e7eb;
-        border-bottom:2px solid #fff;
-        z-index:2;
-        font-weight:600;
+      .custom-tab:hover {
+        color: #374151;
+        background: #f9fafb;
+        border-color: #e5e7eb;
       }
-      .dark .custom-tab{
-        color:#9ca3af;
+      .custom-tab.active {
+        color: #111827;
+        background: #fff;
+        border-color: #e5e7eb;
+        border-bottom: 2px solid #fff;
+        z-index: 2;
+        font-weight: 600;
       }
-      .dark .custom-tab:hover{
-        color:#d1d5db;
-        background:#1f2937;
-        border-color:#374151;
+      .dark .custom-tab {
+        color: #9ca3af;
       }
-      .dark .custom-tab.active{
-        color:#f9fafb;
-        background:#000;
-        border-color:#374151;
-        border-bottom:2px solid #000;
+      .dark .custom-tab:hover {
+        color: #d1d5db;
+        background: #1f2937;
+        border-color: #374151;
       }
-      .custom-tab.active::before{
-        content:'';
-        position:absolute;
-        top:0; left:0; right:0; bottom:-1px;
-        background:inherit;
-        border-radius:inherit;
-        box-shadow:0 -2px 4px rgba(0,0,0,.1);
-        z-index:-1;
+      .dark .custom-tab.active {
+        color: #f9fafb;
+        background: #000;
+        border-color: #374151;
+        border-bottom: 2px solid #000;
       }
-      .dark .custom-tab.active::before{
-        box-shadow:0 -2px 4px rgba(0,0,0,.3);
+      .custom-tab.active::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: -1px;
+        background: inherit;
+        border-radius: inherit;
+        box-shadow: 0 -2px 4px rgba(0,0,0,.1);
+        z-index: -1;
       }
-      @media (max-width:640px){
-        .custom-tabs{padding:0 .5rem;}
-        .custom-tab{padding:.5rem 1rem;font-size:.8rem;}
+      .dark .custom-tab.active::before {
+        box-shadow: 0 -2px 4px rgba(0,0,0,.3);
       }
+      @media (max-width:640px) {
+        .custom-tabs { padding: 0 .5rem; }
+        .custom-tab { padding: .5rem 1rem; font-size: .8rem; }
+      }
+
       .toggle-switch {
         position: relative;
         display: inline-block;
-        width: 40px;
-        height: 20px;
+        width: 40px; height: 20px;
       }
       .toggle-switch input {
-        opacity: 0;
-        width: 0; height: 0;
+        opacity: 0; width: 0; height: 0;
       }
       .toggle-switch .slider {
-        position: absolute;
-        cursor: pointer;
+        position: absolute; cursor: pointer;
         top: 0; left: 0; right: 0; bottom: 0;
-        background-color: #ccc;
-        transition: .2s;
-        border-radius: 20px;
+        background-color: #ccc; transition: .2s; border-radius: 20px;
       }
       .toggle-switch .slider:before {
-        position: absolute;
-        content: "";
+        position: absolute; content: "";
         height: 16px; width: 16px;
         left: 2px; bottom: 2px;
-        background-color: white;
-        transition: .2s;
-        border-radius: 50%;
+        background-color: white; transition: .2s; border-radius: 50%;
       }
       .toggle-switch input:checked + .slider {
         background-color: #000;
@@ -127,87 +154,80 @@
   </head>
 
   <body class="bg-white text-black dark:bg-black dark:text-white transition-colors duration-300">
-    <header class="sticky top-0 z-40 w-full border-b border-black bg-white dark:bg-black dark:border-white transition-colors duration-300">
+    <!-- make header a semi-transparent tile -->
+    <header
+      class="sticky top-0 z-40 w-full border-b
+             border-black/20 dark:border-white/20
+             bg-white/50 dark:bg-black/50
+             backdrop-blur-md
+             transition-colors duration-300">
       <div class="flex h-16 items-center px-4 justify-between">
         <div class="flex items-center space-x-2">
           <a href="{{ url_for('index') }}" class="font-bold text-lg text-black dark:text-white">
-            <span class="pixel-font">
-              Confid<span class="bg-black dark:bg-white text-white dark:text-black">EASE</span>
-            </span>
+            <span class="pixel-font">Confid<span class="bg-black dark:bg-white text-white dark:text-black">EASE</span></span>
           </a>
         </div>
+        <a href="{{ url_for('jobs') }}" class="px-4 py-2 text-sm text-black dark:text-white hover:underline">Jobs Dashboard</a>
 
-        <a href="{{ url_for('jobs') }}" class="px-4 py-2 text-sm text-black dark:text-white hover:underline">
-          Jobs Dashboard
+        {% if session.get('current_job_id') %}
+          {% set job_id = session.current_job_id %}
+        {% endif %}
+
+        <a href="{{ url_for('overview', job_id=job_id) }}"
+           class="custom-tab {% if request.endpoint == 'overview' %}active{% endif %}">
+          Overview
         </a>
 
         <div class="flex items-center space-x-2">
-          <!-- switch -->
           <label class="toggle-switch">
             <input id="darkModeSwitch" type="checkbox" onchange="toggleDarkMode()">
             <span class="slider"></span>
           </label>
-          <!-- label -->
-          <span class="text-sm font-medium text-black dark:text-white">
-            Dark Mode
-          </span>
+          <span class="text-sm font-medium text-black dark:text-white">Dark Mode</span>
         </div>
+      </div>
     </header>
 
     {% if session.get('current_job_id') %}
       {% set job_id = session.current_job_id %}
-      <div class="custom-tabs-container">
+      <div
+          class="sticky top-0 z-40 w-full border-b
+                 border-black/20 dark:border-white/20
+                 bg-white/50 dark:bg-black/50
+                 backdrop-blur-md
+                 transition-colors duration-300">
         <div class="custom-tabs">
-          <a href="{{ url_for('highlight_phrase', job_id=job_id) }}"
-             class="custom-tab {% if request.endpoint=='highlight_phrase' %}active{% endif %}">
-            Picked Keywords
-          </a>
-          <a href="{{ url_for('upload_resume', job_id=job_id) }}"
-             class="custom-tab {% if request.endpoint=='upload_resume' or request.endpoint=='compare_resume' %}active{% endif %}">
-            Resume Tailoring
-          </a>
-          <a href="{{ url_for('news', job_id=job_id) }}"
-             class="custom-tab {% if request.endpoint=='news' %}active{% endif %}">
-            News
-          </a>
-          <a href="{{ url_for('people', job_id=job_id) }}"
-             class="custom-tab {% if request.endpoint=='people' %}active{% endif %}">
-            People
-          </a>
+          <a href="{{ url_for('highlight_phrase', job_id=job_id) }}" class="custom-tab {% if request.endpoint=='highlight_phrase' %}active{% endif %}">Picked Keywords</a>
+          <a href="{{ url_for('upload_resume',   job_id=job_id) }}" class="custom-tab {% if request.endpoint in ['upload_resume','compare_resume'] %}active{% endif %}">Resume Tailoring</a>
+          <a href="{{ url_for('news',           job_id=job_id) }}" class="custom-tab {% if request.endpoint=='news' %}active{% endif %}">News</a>
+          <a href="{{ url_for('people',         job_id=job_id) }}" class="custom-tab {% if request.endpoint=='people' %}active{% endif %}">People</a>
         </div>
       </div>
     {% endif %}
 
-    <main class="bg-white dark:bg-black">
+    <main class="min-h-screen">
       {% block content %}{% endblock %}
     </main>
 
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
-
     <script>
       const themeKey = 'themePreference';
       const htmlEl   = document.documentElement;
       const toggle   = document.getElementById('darkModeSwitch');
 
       function applyTheme(theme) {
-        if (theme === 'dark') {
-          htmlEl.classList.add('dark');
-        } else {
-          htmlEl.classList.remove('dark');
-        }
+        htmlEl.classList.toggle('dark', theme==='dark');
         localStorage.setItem(themeKey, theme);
-        if (toggle) toggle.checked = (theme === 'dark');
+        if (toggle) toggle.checked = (theme==='dark');
       }
 
       function toggleDarkMode() {
-        const next = htmlEl.classList.contains('dark') ? 'light' : 'dark';
-        applyTheme(next);
+        applyTheme(htmlEl.classList.contains('dark') ? 'light' : 'dark');
       }
 
       window.addEventListener('DOMContentLoaded', () => {
-        const saved = localStorage.getItem(themeKey) || 'light';
-        applyTheme(saved);
+        applyTheme(localStorage.getItem(themeKey)||'light');
       });
     </script>
   </body>

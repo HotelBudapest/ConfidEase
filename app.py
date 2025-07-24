@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, session
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, jsonify, request
 import uuid
 from extractor import extract_phrases
 from wordcloud import WordCloud
@@ -46,7 +46,45 @@ summary_cache = {}
 _resume_store = {}
 COMPANY_NEWS_CACHE = {}
 PEOPLE_CACHE = {}
+SUGGESTION_CACHE = {}  # { job_id: { phrase: {category,suggestion} } }
 
+def llm_categorize(phrase):
+    prompt = (
+        f"Categorize this keyword into exactly one of: Technical, Interpersonal, Academic.\n"
+        f"Keyword: “{phrase}”\n"
+        f"Answer with exactly one word."
+    )
+    resp = summarizer(
+        prompt,
+        max_length=16,
+        do_sample=False   # deterministic is OK for a tiny classification
+    )[0]["generated_text"].strip()
+    for cat in ("Technical", "Interpersonal", "Academic"):
+        if cat.lower() in resp.lower():
+            return cat
+    return "Technical"
+
+def llm_suggest(phrase, category, resume_text):
+    prompt = (
+        f"You are a career coach.  Given the **resume excerpt** below and the **skill** “{phrase}” "
+        f"(category: {category}), write **one concise bullet point** showing how to weave that skill "
+        f"into the candidate’s current role.  **Do not** repeat the resume; output only the new bullet.\n\n"
+        f"Resume excerpt:\n"
+        f"{resume_text[:300]}\n\n"
+        f"Skill: {phrase}\n"
+    )
+    return summarizer(
+        prompt,
+        max_length=120,
+        do_sample=False,
+        temperature=0.3
+    )[0]["generated_text"].strip().rstrip(".") + "."
+
+# And in case you ever want to clear and regenerate:
+@app.route('/suggestions/<job_id>/refresh')
+def suggestions_refresh(job_id):
+    SUGGESTION_CACHE.pop(job_id, None)
+    return redirect(url_for('suggestions', job_id=job_id))
 
 @app.template_filter('highlight')
 def highlight_filter(text, term):
@@ -91,6 +129,26 @@ def cache_people(company: str, profiles):
     """Cache the LinkedIn profiles under this company key."""
     PEOPLE_CACHE[company.lower()] = (time.time(), profiles)
 
+@app.route('/track_json/people/<job_id>', methods=['POST'])
+def track_people_json(job_id):
+    job = get_job(job_id)
+    url = request.json.get("url")
+    if not job or not url:
+        return jsonify(score=0), 400
+
+    # Ensure we have a list and record only once
+    clicked = job.setdefault('clicked_people', [])
+    if url not in clicked:
+        clicked.append(url)
+        session.modified = True
+
+    # Recompute score against current profiles list
+    profiles = get_cached_people(job['company']) or []
+    total = len(profiles)
+    people_score = int(len(clicked) / total * 100) if total else 0
+
+    return jsonify(score=people_score)
+
 @app.route('/people/<job_id>')
 def people(job_id):
     job = get_job(job_id)
@@ -109,9 +167,84 @@ def people(job_id):
             app.logger.error(f"LinkedIn search error: {e}")
             profiles = []
 
-    return render_template("people.html",
-                           company=company,
-                           profiles=profiles)
+    # ——— PEOPLE SECTION SCORING ———
+    clicked = job.get('clicked_people', [])
+    total   = len(profiles)
+    people_score = int(len(clicked) / total * 100) if total > 0 else 0
+
+    return render_template(
+        "people.html",
+        job=job,                    # ← add this
+        company=company,
+        profiles=profiles,
+        clicked_people=clicked,
+        people_score=people_score
+    )
+
+
+@app.route('/overview/<job_id>')
+def overview(job_id):
+    # 1) grab the job
+    job = get_job(job_id)
+    if not job:
+        return "Job not found", 404
+
+    # 2) keywords_score → full credit once they've visited the keywords page
+    keywords_score = 100 if job.get('keywords_visited', False) else 0
+    job['keywords_score'] = keywords_score
+
+    # 3) resume_score → pull match_percentage from your resume_analysis
+    resume_score = 0
+    if job.get('resume_analysis'):
+        resume_score = job['resume_analysis'].get('match_percentage', 0)
+    job['resume_score'] = resume_score
+
+    # 4) people_score → % of LinkedIn profiles they've clicked
+    profiles = get_cached_people(job.get('company', '')) or []
+    total_people   = len(profiles)
+    clicked_people = job.get('clicked_people', [])
+    people_score = int(len(clicked_people) / total_people * 100) if total_people else 0
+    job['people_score'] = people_score
+
+    company = job.get('company')
+    industry = job.get('industry', 'technology')
+
+    # fetch each (or empty list)
+    company_items = get_cached_company_news(company) or [] if company else []
+    market_items  = get_cached_news(industry) or []
+
+    # unify & dedupe by link
+    all_items = company_items + market_items
+    all_urls  = { item['link'] for item in all_items }
+
+    clicked_news = job.get('clicked_news', [])
+    hits        = sum(1 for u in clicked_news if u in all_urls)
+    total_news  = len(all_urls)
+
+    news_score = int(hits / total_news * 100) if total_news else 0
+    job['news_score'] = news_score
+
+    # mark session modified so that these get saved
+    session.modified = True
+
+    # 6) overall with your weights
+    overall_score = round(
+        keywords_score * 0.1 +
+        resume_score   * 0.4 +
+        people_score   * 0.3 +
+        news_score     * 0.2,
+        2
+    )
+
+    return render_template(
+        'overview.html',
+        job=job,
+        keywords_score=keywords_score,
+        resume_score=resume_score,
+        people_score=people_score,
+        news_score=news_score,
+        overall_score=overall_score
+    )
 
 @app.route('/news/<job_id>')
 def news(job_id):
@@ -120,41 +253,52 @@ def news(job_id):
         return "Job not found", 404
 
     session['current_job_id'] = job_id
-    source = request.args.get('source', 'market')
+
+    # Default to company if a company is set, otherwise market
+    raw_source = request.args.get('source')
+    source = raw_source if raw_source in ('market','company') else \
+             ('company' if job.get('company') else 'market')
+
     news_items = []
     loading    = False
 
     if source == 'company' and job.get('company'):
-        # COMPANY NEWS
+        # COMPANY NEWS: try cache, else fetch and cache immediately
         company = job['company']
         cached  = get_cached_company_news(company)
         if cached is None:
-            session['news_loading'] = True
-            def bg_fetch_co():
+            try:
                 items = fetch_company_news(company)
                 cache_company_news(company, items)
-            Thread(target=bg_fetch_co, daemon=True).start()
-            loading = True
+                news_items = items
+            except Exception as e:
+                app.logger.error(f"Company news fetch error: {e}")
+                news_items = []
         else:
-            session.pop('news_loading', None)
             news_items = cached
-
         industries = None
 
     else:
+        # MARKET NEWS: try cache, else fetch and cache immediately
         industry = job.get('industry', 'technology')
         cached   = get_cached_news(industry)
         if cached is None:
-            session['news_loading'] = True
-            def bg_fetch_mkt():
-                get_news_for_industry(industry)
-            Thread(target=bg_fetch_mkt, daemon=True).start()
-            loading = True
+            try:
+                items = get_news_for_industry(industry)
+                news_items = items
+            except Exception as e:
+                app.logger.error(f"Market news fetch error: {e}")
+                news_items = []
         else:
-            session.pop('news_loading', None)
             news_items = cached
-
         industries = get_available_industries()
+
+    # ——— NEWS SCORING ———
+    clicked = job.setdefault('clicked_news', [])
+    current_urls  = [item['link'] for item in news_items]
+    clicked_count = sum(1 for u in clicked if u in current_urls)
+    total         = len(current_urls)
+    news_score    = int(clicked_count / total * 100) if total else 0
 
     return render_template(
       'news.html',
@@ -163,7 +307,9 @@ def news(job_id):
       industry=job.get('industry','technology'),
       industries=industries,
       news_items=news_items,
-      loading=session.get('news_loading', False)
+      loading=loading,
+      clicked_news=clicked,
+      news_score=news_score
     )
 
 @app.route('/jobs', methods=['GET', 'POST'])
@@ -190,6 +336,9 @@ def jobs():
                 'industry': industry,
                 'company': company
             }
+            new_job['keywords_visited'] = False
+            new_job['clicked_news'] = []
+            new_job['clicked_people'] = []
             jobs_list.append(new_job)
             session['jobs'] = jobs_list
 
@@ -201,6 +350,31 @@ def jobs():
         jobs=jobs_list,
         industries=get_available_industries()
     )
+@app.route('/track_json/news/<job_id>', methods=['POST'])
+def track_news_json(job_id):
+    job = get_job(job_id)
+    url = request.json.get("url")
+    if not job or not url:
+        return jsonify(score=0), 400
+
+    # record unique clicks
+    clicked = job.setdefault('clicked_news', [])
+    if url not in clicked:
+        clicked.append(url)
+        session.modified = True
+
+    # recompute against current news items
+    # (we’ll look up what was just fetched)
+    # Note: you could cache news_items in session if you like; here we re-fetch
+    resp_items = get_cached_company_news(job['company']) if request.args.get('source')=='company' else get_cached_news(job.get('industry','technology'))
+    news_items = resp_items or []
+
+    urls = [item['link'] for item in news_items]
+    hit_count = sum(1 for u in clicked if u in urls)
+    total     = len(urls)
+    score     = int(hit_count / total * 100) if total>0 else 0
+
+    return jsonify(score=score)
 
 def get_cached_company_news(company):
     entry = COMPANY_NEWS_CACHE.get(company.lower())
@@ -545,9 +719,22 @@ def highlight_phrase(job_id):
     job = get_job(job_id)
     if not job:
         return "Job not found", 404
-    
+
     session['current_job_id'] = job_id
-    return render_template('results.html', job=job)
+
+    # —————— KEYWORDS SCORING ——————
+    if not job.get('keywords_visited', False):
+        job['keywords_visited'] = True
+        session.modified = True
+
+    # full credit once visited
+    keywords_score = 100
+
+    return render_template(
+        'results.html',
+        job=job,
+        keywords_score=keywords_score
+    )
 
 
 @app.route('/edit_phrases/<job_id>', methods=['GET', 'POST'])
@@ -598,6 +785,42 @@ def summarize_keywords():
         summary_cache[cache_key] = summaries
 
     return render_template('summaries.html', text=text, summaries=summaries)
+
+@app.route('/suggestions/<job_id>')
+def suggestions(job_id):
+    job = get_job(job_id)
+    if not job or not job.get('resume_key') or not job.get('resume_analysis'):
+        return "No resume analysis available for this job", 400
+
+    # only regenerate once per job
+    if job_id not in SUGGESTION_CACHE:
+        # pull just the missing keywords
+        results = job['resume_analysis']
+        missing = results.get('missing_keywords', [])
+        resume_text = "\n".join(_resume_store[job['resume_key']])
+
+        job_cache = {}
+        for phrase in missing:
+            cat = llm_categorize(phrase)
+            sug = llm_suggest(phrase, cat, resume_text)
+            job_cache[phrase] = {"category": cat, "suggestion": sug}
+        SUGGESTION_CACHE[job_id] = job_cache
+
+    # pivot into { category: [ {phrase,suggestion}, … ], … }
+    by_cat = {}
+    for phrase, info in SUGGESTION_CACHE[job_id].items():
+        by_cat.setdefault(info["category"], []).append({
+            "phrase": phrase,
+            "suggestion": info["suggestion"]
+        })
+
+    resume_text = "\n".join(_resume_store[job['resume_key']])
+    return render_template(
+      "suggestions.html",
+      job=job,
+      resume_text=resume_text,
+      suggestions=by_cat
+    )
 
 @app.route('/clear_cache')
 def clear_cache():

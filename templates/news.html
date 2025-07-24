@@ -2,52 +2,77 @@
 {% block content %}
 <div class="p-6">
 
+  <!-- News Progress Tile (with glowing hover) -->
+  <div
+    id="news-progress-tile"
+    class="p-4 mb-6 floating-tile rounded-xl shadow
+           border-2 border-green-300
+           hover:ring-4 hover:ring-green-300 hover:ring-opacity-75 hover:shadow-lg
+           transition-all duration-300"
+  >
+    <div class="flex justify-between items-center mb-1">
+      <span class="font-medium text-gray-700 dark:text-gray-300">
+        News Progress
+      </span>
+      <span id="news-progress-label" class="text-sm font-semibold">
+        {{ news_score }}%
+      </span>
+    </div>
+    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+      <div
+        id="news-progress-bar"
+        class="bg-green-500 h-2.5 rounded-full"
+        style="width: {{ news_score }}%;"
+      ></div>
+    </div>
+  </div>
+
   <!-- Source selector -->
   <form id="news-form" method="GET" class="flex items-center gap-6 mb-6">
-    <!-- when market mode, show industry dropdown -->
-    {% if industries %}
-      <select name="industry"
-              onchange="document.getElementById('news-form').submit()"
-              class="px-3 py-2 border rounded">
-        {% for ind in industries %}
-          <option value="{{ ind }}" {% if ind==industry %}selected{% endif %}>
-            {{ ind.capitalize() }}
-          </option>
-        {% endfor %}
-      </select>
+    {% if job.company %}
+      <label class="inline-flex items-center cursor-pointer">
+        <input type="radio"
+               name="source"
+               value="company"
+               onchange="document.getElementById('news-form').submit()"
+               {% if source=='company' %}checked{% endif %}/>
+        <span class="ml-1">Company News</span>
+      </label>
     {% endif %}
 
     <label class="inline-flex items-center cursor-pointer">
-      <input type="radio" name="source" value="market"
+      <input type="radio"
+             name="source"
+             value="market"
              onchange="document.getElementById('news-form').submit()"
              {% if source=='market' %}checked{% endif %}/>
       <span class="ml-1">Market News</span>
     </label>
-
-    {% if job.company %}
-    <label class="inline-flex items-center cursor-pointer">
-      <input type="radio" name="source" value="company"
-             onchange="document.getElementById('news-form').submit()"
-             {% if source=='company' %}checked{% endif %}/>
-      <span class="ml-1">Company News</span>
-    </label>
-    {% endif %}
   </form>
 
   {% if loading %}
-    <!-- spinner -->
     <div class="flex justify-center py-20">
-      <svg class="animate-spin h-12 w-12 text-gray-500" …>…</svg>
+      <svg class="animate-spin h-12 w-12 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
     </div>
   {% else %}
     {% if news_items %}
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for item in news_items %}
-        <div class="border rounded-lg overflow-hidden dark:bg-gray-800">
-          {% if item.image %}<img src="{{ item.image }}" class="w-full h-32 object-cover"/>{% endif %}
+        <div
+          class="trackable-news-item floating-tile border-2 rounded-lg overflow-hidden dark:bg-gray-800
+                 {% if item.link not in clicked_news %}border-green-300{% else %}border-transparent{% endif %}
+                 hover:ring-4 hover:ring-green-300 hover:ring-opacity-75 hover:shadow-lg
+                 transition-all duration-300"
+        >
+          {% if item.image %}
+            <img src="{{ item.image }}" class="w-full h-32 object-cover"/>
+          {% endif %}
           <div class="p-4">
-            <a href="{{ item.link }}" target="_blank"
-               class="text-lg font-semibold text-black dark:text-white hover:underline">
+            <a href="{{ item.link }}"
+               class="news-link block text-lg font-semibold text-black dark:text-white hover:underline">
               {{ item.title }}
             </a>
             <p class="text-sm text-gray-600 dark:text-gray-400">{{ item.published }}</p>
@@ -59,9 +84,40 @@
       </div>
     {% else %}
       <p class="text-center py-20 text-gray-500">
-        No {{ source }} news yet—please wait a moment and reload.
+        No {{ source }} news yet—please wait and reload.
       </p>
     {% endif %}
   {% endif %}
 </div>
+
+<!-- JS: intercept clicks, POST to /track_json/news, update bar & remove border -->
+<script>
+  document.querySelectorAll('.news-link').forEach(link => {
+    link.addEventListener('click', async e => {
+      e.preventDefault();
+      const url   = link.href;
+      const jobId = "{{ job.id }}";
+
+      // send tracking request
+      let resp = await fetch(`/track_json/news/${jobId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url})
+      });
+
+      if (resp.ok) {
+        const { score } = await resp.json();
+        document.getElementById('news-progress-bar').style.width       = score + '%';
+        document.getElementById('news-progress-label').textContent     = score + '%';
+      }
+
+      // remove persistent green border
+      link.closest('.trackable-news-item')
+          .classList.remove('border-green-300');
+
+      // open in new tab
+      window.open(url, '_blank');
+    });
+  });
+</script>
 {% endblock %}

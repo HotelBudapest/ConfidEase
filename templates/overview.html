@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-6 flex flex-col space-y-6">
+
+  <!-- Overall Score Tile -->
+  <div class="p-4 floating-tile rounded-xl shadow border-2 border-green-300">
+    <div class="flex justify-between items-center mb-1">
+      <span class="font-medium text-gray-700 dark:text-gray-300 text-lg">
+        Overall Score
+      </span>
+      <span class="text-lg font-bold">
+        {{ overall_score }}%
+      </span>
+    </div>
+    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+      <div
+        class="bg-green-600 h-3 rounded-full transition-all"
+        style="width: {{ overall_score }}%;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Section Tiles -->
+  {% for label, score in [
+    ('Keywords Match', keywords_score),
+    ('Resume Tailoring', resume_score),
+    ('People Section', people_score),
+    ('News Exploration', news_score)
+  ] %}
+  <div class="p-4 floating-tile rounded-xl shadow border-2 border-green-300">
+    <div class="flex justify-between items-center mb-1">
+      <span class="font-medium text-gray-700 dark:text-gray-300">
+        {{ label }}
+      </span>
+      <span class="text-sm font-semibold">
+        {{ score }}%
+      </span>
+    </div>
+    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+      <div
+        class="bg-green-500 h-2.5 rounded-full transition-all"
+        style="width: {{ score }}%;">
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+{% endblock %}
+

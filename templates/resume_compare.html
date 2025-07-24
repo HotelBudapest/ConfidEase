@@ -1,9 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="flex flex-col min-h-screen bg-white dark:bg-black text-black dark:text-white transition-colors duration-300">
 
-    <!-- page header -->
-    <header class="py-6 px-4 sm:px-6 lg:px-8 border-b border-gray-200 dark:border-gray-700">
+
+{% if results.matched_keywords %}
+<div class="p-6">
+
+  <!-- News Progress Tile (with glowing hover) -->
+  <div
+    id="news-progress-tile"
+    class="p-4 mb-6 floating-tile rounded-xl shadow
+           border-2 border-green-300
+           hover:ring-4 hover:ring-green-300 hover:ring-opacity-75 hover:shadow-lg
+           transition-all duration-300"
+  >
+    <div class="flex justify-between items-center mb-1">
+      <span class="font-medium text-gray-700 dark:text-gray-300">
+        Resume Tailoring Progress
+      </span>
+      <span id="news-progress-label" class="text-sm font-semibold">
+        {{ results.match_percentage }}%
+      </span>
+    </div>
+    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+      <div
+        id="news-progress-bar"
+        class="bg-green-500 h-2.5 rounded-full"
+        style="width: {{ results.match_percentage }}%;"
+      ></div>
+    </div>
+  </div>
+{% endif %}
+
+    <header class="py-6 px-4 sm:px-6 lg:px-8 border-b border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-black/50 backdrop-blur-md rounded-xl shadow-lg">
       <div class="flex justify-between items-center">
         <div>
           <h1 class="text-2xl font-bold">Resume Analysis Results</h1>
@@ -15,8 +43,8 @@
           <a href="{{ url_for('highlight_phrase', job_id=job.id) }}" class="btn btn-ghost">
             Back to Keywords
           </a>
-          <a href="{{ url_for('annotate_resume', job_id=job.id) }}" class="btn btn-outline">
-            Annotate Sections
+          <a href="{{ url_for('suggestions', job_id=job.id) }}" class="btn btn-outline">
+              Resume Suggestions
           </a>
           <a href="{{ url_for('upload_resume', job_id=job.id, new=1) }}"
                class="btn btn-secondary">
@@ -29,7 +57,7 @@
     <!-- main content -->
     <main class="flex-grow p-4 sm:p-6 lg:p-8 overflow-auto">
       <!-- match summary -->
-      <div class="mb-8 p-6 border border-gray-200 dark:border-gray-700 rounded-lg">
+      <div class="mb-8 p-6 border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-black/50 backdrop-blur-md rounded-xl shadow-lg">
         <h2 class="text-xl font-semibold mb-4">Match Summary</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center">
@@ -53,7 +81,7 @@
       </div>
 
       <!-- lists of matched & missing -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-white/50 dark:bg-black/50 backdrop-blur-md rounded-xl shadow-lg">
         <div class="p-6 border border-gray-200 dark:border-gray-700 rounded-lg">
           <h2 class="text-xl font-semibold mb-4">✅ Matched Keywords</h2>
           {% if results.matched_keywords %}
@@ -68,7 +96,7 @@
             </p>
           {% endif %}
         </div>
-        <div class="p-6 border border-gray-200 dark:border-gray-700 rounded-lg">
+        <div class="p-6 border border-gray-200 dark:border-gray-700">
           <h2 class="text-xl font-semibold mb-4">❌ Missing Keywords</h2>
           {% if results.missing_keywords %}
             <ul class="space-y-2">
@@ -85,7 +113,7 @@
       </div>
 
       <!-- all found keywords -->
-      <div class="mt-6 p-6 border border-gray-200 dark:border-gray-700 rounded-lg">
+      <div class="mt-6 p-6 border border-gray-200 dark:border-gray-700 dark:bg-black/50 backdrop-blur-md rounded-xl shadow-lg">
         <h2 class="text-xl font-semibold mb-4">All Keywords Found in Your Resume</h2>
         <div class="flex flex-wrap gap-2">
           {% for kw in results.resume_keywords %}

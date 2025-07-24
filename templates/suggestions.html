@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="h-[calc(100vh-4rem)] flex gap-6 p-6">
+
+  <!-- Left: Resume -->
+  <div class="w-1/2 overflow-auto bg-white/50 dark:bg-black/50
+              backdrop-blur-md rounded-xl shadow-lg p-6">
+    <pre class="whitespace-pre-wrap text-sm text-black dark:text-white">
+{{ resume_text }}
+    </pre>
+  </div>
+
+  <!-- Right: Suggestions -->
+  <div class="w-1/2 flex flex-col">
+
+    <h2 class="text-2xl font-bold mb-4">Smart Resume Suggestions</h2>
+
+    <!-- category filter -->
+    <div class="mb-4">
+      <label for="category-select" class="mr-2 font-medium">Show:</label>
+      <select id="category-select"
+              class="px-3 py-1 border rounded">
+        <option value="All">All</option>
+        {% for cat in suggestions.keys() %}
+          <option value="{{ cat }}">{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="overflow-auto space-y-6 flex-1 bg-white/50 dark:bg-black/50
+                backdrop-blur-md rounded-xl shadow-lg p-6">
+
+      {% for category, items in suggestions.items() %}
+        <div class="category-section" data-cat="{{ category }}">
+          <h3 class="text-xl font-semibold mb-2">{{ category }}</h3>
+          <ul class="space-y-4">
+            {% for it in items %}
+              <li>
+                <p class="font-medium">{{ it.phrase }}</p>
+                <p class="text-sm">{{ it.suggestion }}</p>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+// simple filter logic
+document.getElementById('category-select').addEventListener('change', function() {
+  const sel = this.value;
+  document.querySelectorAll('.category-section').forEach(sec => {
+    sec.style.display = (sel === 'All' || sec.dataset.cat === sel) ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

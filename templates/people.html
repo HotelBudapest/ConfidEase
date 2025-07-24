@@ -1,28 +1,97 @@
 {% extends "base.html" %}
 {% block content %}
+
 <div class="p-6">
-  <h2 class="text-2xl font-bold mb-4">People @ {{ company }}</h2>
+
+  <!-- People Progress Tile -->
+<div
+  id="people-progress-tile"
+    class="p-4 mb-6 floating-tile rounded-xl shadow
+           border-2 border-green-300
+           hover:ring-4 hover:ring-green-300 hover:ring-opacity-75 hover:shadow-lg
+           transition-all duration-300"
+>
+  <div class="flex justify-between items-center mb-1">
+    <span class="font-medium text-gray-700 dark:text-gray-300">
+      People Progress
+    </span>
+    <span id="people-progress-label" class="text-sm font-semibold">
+      {{ people_score }}%
+    </span>
+  </div>
+  <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+    <div
+      id="people-progress-bar"
+      class="bg-green-500 h-2.5 rounded-full"
+      style="width: {{ people_score }}%;">
+    </div>
+  </div>
+</div>
+
+  <div class="p-6">
+    <h2 class="text-2xl font-bold mb-4">People @ {{ company }}</h2>
     {% if profiles %}
       <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {% for p in profiles %}
-        <li class="flex items-center space-x-4 p-4 border rounded-lg">
-          {% if p.image %}
-            <img src="{{ p.image }}" class="w-12 h-12 rounded-full object-cover" alt="{{ p.name }}"/>
-          {% endif %}
-          <div>
-            <a href="{{ p.url }}" target="_blank"
-               class="text-lg font-semibold text-indigo-600 hover:underline">
-              {{ p.name }}
-            </a>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              {{ p.role | highlight(company) }}
-            </p>
-          </div>
-        </li>
-      {% endfor %}
+        {% for p in profiles %}
+          <li
+            class="trackable-profile flex items-center space-x-6 p-4 rounded-lg floating-tile
+                   border-2 {% if p.url not in clicked_people %}border-green-300{% else %}border-transparent{% endif %}
+                   hover:ring-4 hover:ring-green-300 hover:ring-opacity-75 hover:shadow-lg
+                   transition-all duration-300"
+          >
+            {% if p.image %}
+              <img
+                src="{{ p.image }}"
+                alt="{{ p.name }}"
+                class="w-12 h-12 rounded-full object-cover"
+              />
+            {% endif %}
+            <div>
+              <a
+                href="{{ p.url }}"
+                target="_blank"
+                class="text-lg font-semibold text-indigo-600 hover:underline"
+              >
+                {{ p.name }}
+              </a>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                {{ p.role | highlight(company) }}
+              </p>
+            </div>
+          </li>
+        {% endfor %}
       </ul>
     {% else %}
       <p class="text-gray-500">No public profiles found.</p>
     {% endif %}
-</div>
+  </div>
+
+  <!-- JS: intercept clicks, POST to JSON endpoint, update bar, then open link -->
+  <script>
+    document.querySelectorAll('.trackable-profile a').forEach(link => {
+      link.addEventListener('click', async e => {
+        e.preventDefault();
+        const url   = link.href;
+        const jobId = "{{ job.id }}";
+
+        // send tracking request
+        let resp = await fetch(`/track_json/people/${jobId}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({url})
+        });
+
+        if (resp.ok) {
+          const { score } = await resp.json();
+          // update the progress bar & label
+          document.getElementById('people-progress-bar').style.width       = score + '%';
+          document.getElementById('people-progress-label').textContent     = score + '%';
+        }
+
+        // finally, open LinkedIn in new tab
+        window.open(url, '_blank');
+      });
+    });
+  </script>
+
 {% endblock %}
